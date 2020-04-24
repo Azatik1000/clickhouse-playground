@@ -1,0 +1,22 @@
+version: '3.7'
+services:
+  db:
+    image: yandex/clickhouse-server 
+    ports: 
+    - "8123:8123"
+    - "9000:9000"
+  # client:
+  #   image: yandex/clickhouse-server
+  #   depends_on:
+  #   - db    
+  #   stdin_open: true
+  #   tty: true
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+    - "8080:8080"
+    depends_on: 
+    - db
+
