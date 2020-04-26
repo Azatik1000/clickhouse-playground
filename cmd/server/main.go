@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Azatik1000/clickhouse-playground/pkg/clickhouse"
+	"github.com/Azatik1000/clickhouse-playground/pkg/internal/clickhouse"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"go.uber.org/zap"
 	"log"
