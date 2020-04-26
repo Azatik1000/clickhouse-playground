@@ -2,8 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/Azatik1000/clickhouse-playground/pkg/internal/clickhouse"
+	"github.com/Azatik1000/clickhouse-playground/internal/pkg/clickhouse"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"go.uber.org/zap"
 	"log"
@@ -60,15 +59,12 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("here")
-
 	result, err := s.chDriver.Exec(input.Query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	//w.WriteHeader(http.StatusOK)
 	encoder := json.NewEncoder(w)
 
 	if err = encoder.Encode(execOutput{Result: result}); err != nil {
