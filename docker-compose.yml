@@ -16,7 +16,12 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-    - "8080:8080"
+    - "3999:8080"
     depends_on: 
     - db
+  frontend:
+    build:
+      context: frontend
+    depends_on:
+      - server
 
