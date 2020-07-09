@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/Azatik1000/clickhouse-playground/internal/pkg/clickhouse"
+	"app/clickhouse"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"go.uber.org/zap"
 	"log"

@@ -13,8 +13,7 @@ services:
   #   tty: true
   server:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: app
     ports:
     - "3999:8080"
     depends_on: 
@@ -22,6 +21,15 @@ services:
   frontend:
     build:
       context: frontend
+    volumes:
+      - "/app/node_modules"
+      - "./frontend:/app"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    ports:
+      - "3001:3000"
+    stdin_open: true
+    tty: true
     depends_on:
       - server
 

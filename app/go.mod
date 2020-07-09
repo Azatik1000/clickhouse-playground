@@ -1,4 +1,4 @@
-module github.com/Azatik1000/clickhouse-playground
+module app
 
 go 1.14
 
