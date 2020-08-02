@@ -1,9 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"app/clickhouse"
+	"app/models"
+	"app/storage"
+	"encoding/json"
 	_ "github.com/ClickHouse/clickhouse-go"
+	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
@@ -12,10 +15,11 @@ import (
 
 type pgServer struct {
 	chDriver clickhouse.Driver
+	storage  storage.Storage
 }
 
-func newPgServer(driver clickhouse.Driver) *pgServer {
-	return &pgServer{chDriver: driver}
+func newPgServer(driver clickhouse.Driver, s storage.Storage) *pgServer {
+	return &pgServer{chDriver: driver, storage: s}
 }
 
 func main() {
@@ -27,7 +31,7 @@ func main() {
 	sugar := logger.Sugar()
 	sugar.Info("starting")
 
-	endpoint, err := url.Parse("http://172.19.0.2:8123")
+	endpoint, err := url.Parse("http://db:8123")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,14 +39,21 @@ func main() {
 	var driver clickhouse.Driver = clickhouse.NewHTTPDriver(endpoint)
 	driver.HealthCheck()
 
-	server := newPgServer(driver)
+	s := storage.NewMemory()
+	server := newPgServer(driver, s)
 
-	http.HandleFunc("/exec", server.handleExec)
-	_ = http.ListenAndServe(":8080", nil)
+	c := cors.Default()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/exec", server.handleExec)
+
+	handler := c.Handler(mux)
+
+	_ = http.ListenAndServe(":8080", handler)
 }
 
 type execInput struct {
-	Query string `json:"query"`
+	QueryStr string `json:"query"`
 }
 
 type execOutput struct {
@@ -59,7 +70,18 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := s.chDriver.Exec(input.Query)
+	query := models.NewQuery(input.QueryStr)
+	found := s.storage.FindRun(query.Hash)
+
+	// This query was already run
+	if found != nil {
+
+	} else {
+		
+	}
+	//sum := sha256.Sum256([]byte(input.QueryStr))
+
+	result, err := s.chDriver.Exec(input.QueryStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

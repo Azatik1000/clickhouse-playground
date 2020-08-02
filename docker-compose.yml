@@ -11,19 +11,20 @@ services:
   #   - db    
   #   stdin_open: true
   #   tty: true
-  server:
+  backend:
     build:
       context: app
     ports:
     - "3999:8080"
     depends_on: 
     - db
+    links:
+    - db
   frontend:
     build:
-      context: frontend
+      context: ./frontend/project
     volumes:
-      - "/app/node_modules"
-      - "./frontend:/app"
+      - "./frontend/project/:/install/app/"
     environment:
       - CHOKIDAR_USEPOLLING=true
     ports:
@@ -31,5 +32,7 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-      - server
+      - backend
+    links:
+      - backend
 
