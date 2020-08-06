@@ -1,4 +1,4 @@
-package clickhouse
+package driver
 
 import (
 	"bytes"
@@ -18,18 +18,22 @@ func NewHTTPDriver(endpoint *url.URL) *HTTPDriver {
 	return &HTTPDriver{endpoint: endpoint}
 }
 
-func (d *HTTPDriver) HealthCheck() bool {
+func (d *HTTPDriver) HealthCheck() error {
 	response, err := http.Get(d.endpoint.String())
 	if err != nil {
-		return false
+		return err
 	}
 
 	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return false
+		return err
 	}
 
-	return bytes.Equal(contents, []byte("Ok."))
+	if !bytes.Equal(contents, []byte("Ok.\n")) {
+		return fmt.Errorf("strings \"%s\", \"%s\"dont match", contents, "Ok.")
+	}
+
+	return nil
 }
 
 func (d *HTTPDriver) Exec(query string) (string, error) {

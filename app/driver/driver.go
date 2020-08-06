@@ -1,8 +1,8 @@
-package clickhouse
+package driver
 
 type Driver interface {
 	Exec(query string) (string, error)
-	HealthCheck() bool
+	HealthCheck() error
 }
 
 

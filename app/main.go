@@ -1,25 +1,24 @@
 package main
 
 import (
-	"app/clickhouse"
 	"app/models"
 	"app/storage"
+	"app/worker"
 	"encoding/json"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
-	"net/url"
 )
 
 type pgServer struct {
-	chDriver clickhouse.Driver
-	storage  storage.Storage
+	pool    *worker.Pool
+	storage storage.Storage
 }
 
-func newPgServer(driver clickhouse.Driver, s storage.Storage) *pgServer {
-	return &pgServer{chDriver: driver, storage: s}
+func newPgServer(pool *worker.Pool, s storage.Storage) *pgServer {
+	return &pgServer{pool: pool, storage: s}
 }
 
 func main() {
@@ -31,16 +30,17 @@ func main() {
 	sugar := logger.Sugar()
 	sugar.Info("starting")
 
-	endpoint, err := url.Parse("http://db:8123")
+	s := storage.NewMemory()
+	pool, err := worker.NewPool(2)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var driver clickhouse.Driver = clickhouse.NewHTTPDriver(endpoint)
-	driver.HealthCheck()
+	if err = pool.Start(); err != nil {
+		log.Fatal(err)
+	}
 
-	s := storage.NewMemory()
-	server := newPgServer(driver, s)
+	server := newPgServer(pool, s)
 
 	c := cors.Default()
 
@@ -77,11 +77,11 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	if found != nil {
 
 	} else {
-		
+
 	}
 	//sum := sha256.Sum256([]byte(input.QueryStr))
 
-	result, err := s.chDriver.Exec(input.QueryStr)
+	result, err := s.pool.Execute(input.QueryStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

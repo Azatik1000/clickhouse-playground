@@ -3,8 +3,8 @@ services:
   db:
     image: yandex/clickhouse-server 
     ports: 
-    - "8123:8123"
-    - "9000:9000"
+    - "8120:8123"
+    # - "9000:9000"
   # client:
   #   image: yandex/clickhouse-server
   #   depends_on:
@@ -16,10 +16,12 @@ services:
       context: app
     ports:
     - "3999:8080"
-    depends_on: 
-    - db
-    links:
-    - db
+    volumes: 
+    - "/var/run/docker.sock:/var/run/docker.sock"
+    # depends_on: 
+    # - db
+    # links:
+    # - db
   frontend:
     build:
       context: ./frontend/project
