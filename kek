@@ -1,0 +1,93 @@
+--------------------------------------------------------------------------------
+-- Welcome to ClickHouse.Playground!
+--
+-- You can try ClickHouse features instantly from your web browser
+--
+-- 1) You can list available databases using such query:
+--
+-- SHOW DATABASES;
+-- ┌─name─────┐
+-- │ datasets │
+-- └──────────┘
+--
+-- There are several datasets available in database `datasets`.
+-- You can learn more about this datasets from our documentation.
+--
+-- 2) To list available tables in a database you can query
+--
+-- SHOW TABLES FROM datasets
+--
+-- ┌─name─────────────────┐
+-- │ hits_100m_obfuscated │
+-- │ hits_v1              │
+-- │ visits_v1            │
+-- └──────────────────────┘
+--
+-- 3) To get more information about a table schema you can use
+--
+-- DESCRIBE TABLE hits_100m_obfuscated
+--
+-- ┌─name──────────────────┬─type───────────┬─default_type─┬─default_expression─┬─comment─┬─codec_expression─┬─ttl_expression─┐
+-- │ WatchID               │ UInt64         │              │                    │         │                  │                │
+-- │ JavaEnable            │ UInt8          │              │                    │         │                  │                │
+-- │ Title                 │ String         │              │                    │         │                  │                │
+-- ...
+-- └───────────────────────┴────────────────┴──────────────┴────────────────────┴─────────┴──────────────────┴────────────────┘
+--
+-- query. Ellipsis is used in examples to omit very long results.
+--
+-- 4) More detailed information about the table such as table engine, partition schema etc can be obtained by
+--
+-- SHOW CREATE TABLE hits_100m_obfuscated
+--
+-- ┌─statement───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+-- │ CREATE TABLE datasets.hits_100m_obfuscated (`WatchID` UInt64, `JavaEnable` UInt8, `Title` String, `GoodEvent` Int16,                    │
+-- │  ... `CLID` UInt32) ENGINE = MergeTree() PARTITION BY toYYYYMM(EventDate) ORDER BY (CounterID, EventDate, intHash32(UserID), EventTime) │
+-- │  SAMPLE BY intHash32(UserID) SETTINGS index_granularity_bytes = 1048576, index_granularity = 8192                                       │
+-- └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+--
+-- Further example queries provide an overview of how to interact with ClickHouse.
+-- You can go through them in any order as all examples are independent.
+--
+-- Let's start with selecting all columns.
+-- Notice that the CH is a column-oriented database management system. Select all
+-- columns is allowed but the right way is to select specific columns.
+--
+-- If the query result is larger than `max_result_bytes` or has more than `max_result_rows`
+-- result will be truncated as Playground overflow_mode for this limits is set to `break`
+--------------------------------------------------------------------------------
+-- ClickHouse Playground is powered by Yandex.Cloud Managed ClickHouse
+-- https://cloud.yandex.com/services/managed-clickhouse
+--------------------------------------------------------------------------------
+
+SELECT                         -- top level SELECT returns data to the client
+
+    *                          -- star symbol means "all columns";
+                               -- columns are often numerous, so horizontal
+                               -- scroll will be used to fit the results table in
+                               -- web interface
+
+FROM `hits_100m_obfuscated`
+                               -- table name.
+                               -- It's not required to specify database name as Playground uses `databases` by default.
+                               -- In this case 'FROM my_table' is same to 'FROM databases.my_table'.
+
+WHERE EventDate = '2013-07-15'
+                               -- Filter by partition key. A partition is a logical
+                               -- combination of records in a table by a specified
+                               -- criterion.
+
+LIMIT 100;                     -- limit number of lines in the result
+                               -- if/when it exceeds 100
+
+--------------------------------------------------------------------------------
+-- Partitioning is available for the MergeTree family tables (including replicated
+-- tables). Materialized views based on MergeTree table support partitioning as well.
+-- Read more about partition at:
+-- https://clickhouse.tech/docs/en/operations/table_engines/custom_partitioning_key/
+--
+-- Read more about query complexity:
+-- https://clickhouse.tech/docs/en/operations/settings/query_complexity/#max-result-bytes
+--
+-- Read more about SHOW queries syntax at:
+-- https://clickhouse.tech/docs/en/query_language/show/

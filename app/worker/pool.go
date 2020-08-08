@@ -2,13 +2,16 @@ package worker
 
 import (
 	"app/docker"
+	"fmt"
+	"github.com/Workiva/go-datastructures/queue"
 	"go.uber.org/multierr"
 	"sync"
 )
 
 type Pool struct {
 	manager *docker.Manager
-	workers []*Worker
+	mu      sync.Mutex
+	queue   *queue.Queue
 }
 
 func NewPool(workersNum int) (*Pool, error) {
@@ -20,9 +23,11 @@ func NewPool(workersNum int) (*Pool, error) {
 	}
 	pool.manager = manager
 
-	pool.workers = make([]*Worker, workersNum)
+	//pool.workers = make([]*Worker, workersNum)
+	pool.queue = queue.New(int64(workersNum))
 	for i := 0; i < workersNum; i++ {
-		pool.workers[i], err = New(i, pool.manager)
+		worker, err := New(i, pool.manager)
+		pool.queue.Put(worker)
 		if err != nil {
 			return nil, err
 		}
@@ -34,18 +39,23 @@ func NewPool(workersNum int) (*Pool, error) {
 func (p *Pool) Start() error {
 	var multiErr error
 	var wg sync.WaitGroup
-	for i := 0; i < len(p.workers); i++ {
-		i := i
+
+	fmt.Println(p.queue.Len())
+	for i := 0; i < int(p.queue.Len()); i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			var err error
-			err = p.workers[i].Run()
+			// TODO: handle error
+			first, _ := p.queue.Get(1)
+			worker := first[0].(*Worker)
+			err = worker.Start()
 			multierr.AppendInto(&multiErr, err)
+			p.queue.Put(worker)
 		}()
 	}
-
 	wg.Wait()
+
 	if len(multierr.Errors(multiErr)) > 0 {
 		return multiErr
 	}
@@ -54,6 +64,17 @@ func (p *Pool) Start() error {
 }
 
 func (p *Pool) Execute(query string) (string, error) {
-	return p.workers[0].Execute(query)
-}
+	// TODO: handle error
+	first, _ := p.queue.Get(1)
+	worker := first[0].(*Worker)
 
+	result, err := worker.Execute(query)
+	// TODO: handle error
+	go func() {
+		_ = worker.Stop()
+		_ = worker.Start()
+		p.queue.Put(worker)
+	}()
+
+	return result, err
+}

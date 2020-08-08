@@ -37,7 +37,6 @@ func (d *HTTPDriver) HealthCheck() error {
 }
 
 func (d *HTTPDriver) Exec(query string) (string, error) {
-	fmt.Println("exec")
 	response, err := http.Post(
 		d.endpoint.String(),
 		"",

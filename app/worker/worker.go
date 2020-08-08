@@ -5,6 +5,7 @@ import (
 	"app/driver"
 	"fmt"
 	"net/url"
+	"time"
 )
 
 type Worker struct {
@@ -14,28 +15,31 @@ type Worker struct {
 	manager   *docker.Manager
 	dbDriver  driver.Driver
 	container *docker.Container
+	exited    chan struct{}
 }
 
-func (w *Worker) resetContainer() error {
+func (w *Worker) setContainer() error {
 	container, err := docker.NewContainer(w.port, w.manager, w.alias)
 	if err != nil {
 		return err
 	}
 
-	err = container.Run(w.handleExit)
+	exited, err := container.Run()
 	if err != nil {
 		return err
 	}
 
 	w.container = container
+	w.exited = exited
+
 	return nil
 }
 
-func (w *Worker) handleExit() {
-	// TODO: handle error
-	container, _ := docker.NewContainer(w.port, w.manager, w.alias)
-	w.container = container
-}
+//func (w *Worker) handleExit() {
+//	// TODO: handle error
+//	container, _ := docker.NewContainer(w.port, w.manager, w.alias)
+//	w.container = container
+//}
 
 func New(id int, manager *docker.Manager) (*Worker, error) {
 	var worker Worker
@@ -43,23 +47,36 @@ func New(id int, manager *docker.Manager) (*Worker, error) {
 	worker.port = 8123 + id
 	worker.alias = fmt.Sprintf("db%d", worker.id)
 	worker.manager = manager
+
+	endpoint, _ := url.Parse(fmt.Sprintf("http://%s:%d", worker.alias, 8123))
+	worker.dbDriver = driver.NewHTTPDriver(endpoint)
+
 	return &worker, nil
 }
 
-func (w *Worker) Run() error {
-	err := w.resetContainer()
+func (w *Worker) Start() error {
+	err := w.setContainer()
 	if err != nil {
 		return err
 	}
 
-	endpoint, _ := url.Parse(fmt.Sprintf("http://%s:%d", w.alias, 8123))
-	w.dbDriver = driver.NewHTTPDriver(endpoint)
-	err = w.dbDriver.HealthCheck()
+	for i := 0; i < 10; i++ {
+		err = w.dbDriver.HealthCheck()
+		if err == nil {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
+
 	if err != nil {
 		return err
 	}
 
-	return err
+	return nil
+}
+
+func (w *Worker) Stop() error {
+	return w.container.Stop()
 }
 
 func (w *Worker) Execute(query string) (string, error) {

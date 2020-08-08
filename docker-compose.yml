@@ -1,9 +1,9 @@
 version: '3.7'
 services:
-  db:
-    image: yandex/clickhouse-server 
-    ports: 
-    - "8120:8123"
+#   db:
+    # image: yandex/clickhouse-server 
+    # ports: 
+    # - "8120:8123"
     # - "9000:9000"
   # client:
   #   image: yandex/clickhouse-server

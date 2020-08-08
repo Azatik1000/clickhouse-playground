@@ -23,10 +23,6 @@ func NewManager() (*Manager, error) {
 		return nil, err
 	}
 
-	//containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
-	//container := containers[0]
-	//container.NetworkSettings.Networks
-
 	// TODO: maybe remove
 	io.Copy(os.Stdout, reader)
 

@@ -5,6 +5,7 @@ import (
 	"app/storage"
 	"app/worker"
 	"encoding/json"
+	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
@@ -35,10 +36,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("created pool successfully")
 
 	if err = pool.Start(); err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("started pool successfully")
 
 	server := newPgServer(pool, s)
 
@@ -61,6 +65,8 @@ type execOutput struct {
 }
 
 func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("exec request")
+
 	decoder := json.NewDecoder(r.Body)
 
 	var input execInput

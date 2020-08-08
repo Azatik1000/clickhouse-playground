@@ -1,15 +1,16 @@
 package worker
 
-import "testing"
+import (
+	"github.com/Workiva/go-datastructures/queue"
+	"testing"
+)
 
 func TestPoolSimple(t *testing.T) {
-	pool, err := NewPool(5)
-	if err != nil {
-		t.Error(err)
-	}
+	q := queue.New(0)
 
-	err = pool.Start()
-	if err != nil {
-		t.Error(err)
-	}
+	go func() {
+		q.Get(1)
+	}()
+
+	q.Put(282)
 }

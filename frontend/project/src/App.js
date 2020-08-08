@@ -74,7 +74,7 @@ class CodeForm extends React.Component {
             <form onSubmit={this.handleSubmit}>
                 <label>
                     Code:
-                    <input type="text" value={this.state.code} onChange={this.handleChange}/>
+                    <textarea cols="40" rows="5" value={this.state.code} onChange={this.handleChange}/>
                 </label>
                 <input type="submit" value="Submit"/>
             </form>

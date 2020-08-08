@@ -37,20 +37,8 @@ func NewContainer(port int, manager *Manager, alias string) (*Container, error) 
 	)
 
 	endpointsConfig := map[string]*network.EndpointSettings{
-		"clickhouse-playground_default": &network.EndpointSettings{
-			IPAMConfig:          nil,
-			Links:               nil,
+		"clickhouse-playground_default": {
 			Aliases:             []string{alias},
-			NetworkID:           "",
-			EndpointID:          "",
-			Gateway:             "",
-			IPAddress:           "",
-			IPPrefixLen:         0,
-			IPv6Gateway:         "",
-			GlobalIPv6Address:   "",
-			GlobalIPv6PrefixLen: 0,
-			MacAddress:          "",
-			DriverOpts:          nil,
 		},
 	}
 
@@ -60,11 +48,14 @@ func NewContainer(port int, manager *Manager, alias string) (*Container, error) 
 		Image:        imageName,
 		ExposedPorts: exposedPorts,
 	}, &container.HostConfig{
+		Binds:        []string{},
 		PortBindings: portBindings,
-		NetworkMode: container.NetworkMode("clickhouse-playground_default"),
-	}, &network.NetworkingConfig{
-		EndpointsConfig: endpointsConfig,
-	}, "")
+		DNS:          []string{},
+		DNSOptions:   []string{},
+		DNSSearch:    []string{},
+		NetworkMode:  container.NetworkMode("clickhouse-playground_default"),
+		IpcMode:      container.IpcMode("shareable"),
+	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, "")
 
 	if err != nil {
 		return nil, err
@@ -73,35 +64,36 @@ func NewContainer(port int, manager *Manager, alias string) (*Container, error) 
 	return &Container{manager, resp.ID}, nil
 }
 
-func (c *Container) GetIP() string {
-	info, err := c.manager.ContainerInspect(context.Background(), c.id)
-	if err != nil {
-		panic(err)
-	}
+//func (c *Container) GetIP() string {
+//	info, err := c.manager.ContainerInspect(context.Background(), c.id)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	return info.NetworkSettings.Networks["clickhouse-playground_default"].IPAddress
+//}
 
-	return info.NetworkSettings.Networks["clickhouse-playground_default"].IPAddress
-}
-
-func (c *Container) Run(callback func()) error {
+func (c *Container) Run() (chan struct{}, error) {
 	ctx := context.Background()
 	if err := c.manager.ContainerStart(ctx, c.id, types.ContainerStartOptions{}); err != nil {
-		return err
+		return nil, err
 	}
 
+	exited := make(chan struct{})
 	statusCh, errCh := c.manager.ContainerWait(ctx, c.id, container.WaitConditionNotRunning)
 	go func() {
 		// TODO: handle leak
 		select {
 		case err := <-errCh:
+			exited <- struct{}{}
 			if err != nil {
-				callback()
 			}
 		case <-statusCh:
-			callback()
+			exited <- struct{}{}
 		}
 	}()
 
-	return nil
+	return exited, nil
 
 	//out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
 	//if err != nil {
@@ -109,4 +101,8 @@ func (c *Container) Run(callback func()) error {
 	//}
 	//
 	//stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+}
+
+func (c *Container) Stop() error {
+	return c.manager.ContainerStop(context.Background(), c.id, nil)
 }
