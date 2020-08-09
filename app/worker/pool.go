@@ -2,9 +2,7 @@ package worker
 
 import (
 	"app/docker"
-	"fmt"
 	"github.com/Workiva/go-datastructures/queue"
-	"go.uber.org/multierr"
 	"sync"
 )
 
@@ -23,45 +21,63 @@ func NewPool(workersNum int) (*Pool, error) {
 	}
 	pool.manager = manager
 
-	//pool.workers = make([]*Worker, workersNum)
+	//endpoint, _ := url.Parse(fmt.Sprintf("http://%s:%d", worker.alias, 8123))
+
 	pool.queue = queue.New(int64(workersNum))
+
+	type Result struct {
+		*Worker
+		error
+	}
+
+	results := make(chan Result)
+
 	for i := 0; i < workersNum; i++ {
-		worker, err := New(i, pool.manager)
-		pool.queue.Put(worker)
-		if err != nil {
-			return nil, err
+		i := i
+		go func() {
+			w, err := New(i, pool.manager)
+			results <- Result{w, err}
+		}()
+	}
+
+	for i := 0; i < workersNum; i++ {
+		result := <-results
+		if result.error != nil {
+			return nil, result.error
 		}
+
+		pool.queue.Put(result.Worker)
 	}
 
 	return &pool, nil
 }
 
-func (p *Pool) Start() error {
-	var multiErr error
-	var wg sync.WaitGroup
-
-	fmt.Println(p.queue.Len())
-	for i := 0; i < int(p.queue.Len()); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var err error
-			// TODO: handle error
-			first, _ := p.queue.Get(1)
-			worker := first[0].(*Worker)
-			err = worker.Start()
-			multierr.AppendInto(&multiErr, err)
-			p.queue.Put(worker)
-		}()
-	}
-	wg.Wait()
-
-	if len(multierr.Errors(multiErr)) > 0 {
-		return multiErr
-	}
-
-	return nil
-}
+//func (p *Pool) Start() error {
+//	var multiErr error
+//	var wg sync.WaitGroup
+//
+//	fmt.Println(p.queue.Len())
+//	for i := 0; i < int(p.queue.Len()); i++ {
+//		wg.Add(1)
+//		go func() {
+//			defer wg.Done()
+//			var err error
+//			// TODO: handle error
+//			first, _ := p.queue.Get(1)
+//			worker := first[0].(*Worker)
+//			err = worker.StartDb()
+//			multierr.AppendInto(&multiErr, err)
+//			p.queue.Put(worker)
+//		}()
+//	}
+//	wg.Wait()
+//
+//	if len(multierr.Errors(multiErr)) > 0 {
+//		return multiErr
+//	}
+//
+//	return nil
+//}
 
 func (p *Pool) Execute(query string) (string, error) {
 	// TODO: handle error
@@ -71,8 +87,7 @@ func (p *Pool) Execute(query string) (string, error) {
 	result, err := worker.Execute(query)
 	// TODO: handle error
 	go func() {
-		_ = worker.Stop()
-		_ = worker.Start()
+		_ = worker.Restart()
 		p.queue.Put(worker)
 	}()
 

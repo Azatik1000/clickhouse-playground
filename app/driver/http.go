@@ -10,15 +10,15 @@ import (
 	"strings"
 )
 
-type HTTPDriver struct {
+type httpDriver struct {
 	endpoint *url.URL
 }
 
-func NewHTTPDriver(endpoint *url.URL) *HTTPDriver {
-	return &HTTPDriver{endpoint: endpoint}
+func NewHTTPDriver(endpoint *url.URL) Driver {
+	return &httpDriver{endpoint: endpoint}
 }
 
-func (d *HTTPDriver) HealthCheck() error {
+func (d *httpDriver) HealthCheck() error {
 	response, err := http.Get(d.endpoint.String())
 	if err != nil {
 		return err
@@ -36,7 +36,7 @@ func (d *HTTPDriver) HealthCheck() error {
 	return nil
 }
 
-func (d *HTTPDriver) Exec(query string) (string, error) {
+func (d *httpDriver) Exec(query string) (string, error) {
 	response, err := http.Post(
 		d.endpoint.String(),
 		"",
@@ -60,4 +60,9 @@ func (d *HTTPDriver) Exec(query string) (string, error) {
 
 	return string(data), nil
 }
+
+func (d *httpDriver) Close() error {
+	return nil
+}
+
 

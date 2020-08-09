@@ -38,12 +38,6 @@ func main() {
 	}
 	log.Println("created pool successfully")
 
-	if err = pool.Start(); err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("started pool successfully")
-
 	server := newPgServer(pool, s)
 
 	c := cors.Default()

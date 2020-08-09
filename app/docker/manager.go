@@ -18,7 +18,7 @@ func NewManager() (*Manager, error) {
 		return nil, err
 	}
 
-	reader, err := cli.ImagePull(context.Background(), imageName, types.ImagePullOptions{})
+	reader, err := cli.ImagePull(context.Background(), dbServerImageName, types.ImagePullOptions{})
 	if err != nil {
 		return nil, err
 	}

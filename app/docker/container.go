@@ -1,24 +1,34 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+	"io"
 )
 
-var imageName = "yandex/clickhouse-server"
+var dbServerImageName = "yandex/clickhouse-server"
+var dbClientImageName = "yandex/clickhouse-client"
 
 type Container struct {
 	manager *Manager
-	id      string
+	Id      string
 }
 
-func NewContainer(port int, manager *Manager, alias string) (*Container, error) {
-	ctx := context.Background()
+type DbServerContainer Container
+type DbClientContainer Container
 
+func NewDbServer(
+	port int,
+	manager *Manager,
+	alias string,
+	name string,
+) (*DbServerContainer, error) {
+	// TODO: can i move this configuration to dockerfile and import from it?
 	containerPort := nat.Port(fmt.Sprintf("%d/tcp", 8123))
 	hostPort := fmt.Sprintf("%d", port)
 
@@ -38,49 +48,116 @@ func NewContainer(port int, manager *Manager, alias string) (*Container, error) 
 
 	endpointsConfig := map[string]*network.EndpointSettings{
 		"clickhouse-playground_default": {
-			Aliases:             []string{alias},
+			Aliases: []string{alias},
 		},
 	}
 
 	fmt.Println("creating a container")
 	// TODO: add restart policy
-	resp, err := manager.ContainerCreate(ctx, &container.Config{
-		Image:        imageName,
+	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
+		Image:        dbServerImageName,
 		ExposedPorts: exposedPorts,
 	}, &container.HostConfig{
-		Binds:        []string{},
 		PortBindings: portBindings,
-		DNS:          []string{},
-		DNSOptions:   []string{},
-		DNSSearch:    []string{},
-		NetworkMode:  container.NetworkMode("clickhouse-playground_default"),
-		IpcMode:      container.IpcMode("shareable"),
-	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, "")
+		NetworkMode:  "clickhouse-playground_default",
+		AutoRemove:   true,
+	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, name)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &Container{manager, resp.ID}, nil
+	return &DbServerContainer{manager, resp.ID}, nil
 }
 
-//func (c *Container) GetIP() string {
-//	info, err := c.manager.ContainerInspect(context.Background(), c.id)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	return info.NetworkSettings.Networks["clickhouse-playground_default"].IPAddress
-//}
+func NewDbClient(
+	manager *Manager,
+	backendName string,
+) (*DbClientContainer, error) {
+	// TODO: remove code duplication
+	//endpointsConfig := map[string]*network.EndpointSettings{
+	//	"clickhouse-playground_default": {
+	//		Aliases:             []string{alias},
+	//	},
+	//}
+
+	fmt.Println("creating a container")
+	// TODO: add restart policy
+	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
+		Image:        dbClientImageName,
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		OpenStdin:    true,
+		Cmd: []string{
+			"--port=8123",
+			fmt.Sprintf("--host=%s", backendName),
+			"-nm",
+		},
+	}, &container.HostConfig{
+		// TODO: remove hardcode
+		NetworkMode: "clickhouse-playground_default",
+		AutoRemove:  true,
+		//Links:       []string{fmt.Sprintf("%s:%s", backendName, "clickhouse-server")},
+	}, nil, "")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &DbClientContainer{manager, resp.ID}, nil
+}
+
+func (c *DbClientContainer) Write(input []byte) ([]byte, error) {
+	hr, err := c.manager.ContainerAttach(context.Background(), c.Id, types.ContainerAttachOptions{
+		Stream: true,
+		Stdin:  true,
+		Stdout: true,
+		Stderr: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("start writing", input)
+
+	n, err := io.Copy(hr.Conn, bytes.NewReader(input))
+	fmt.Printf("wrote %d bytes to connection\n", n)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if v, ok := hr.Conn.(interface{ CloseWrite() error }); ok {
+		fmt.Println("closing write")
+		v.CloseWrite()
+	} else {
+		fmt.Println("no such method")
+	}
+
+	fmt.Println("wrote")
+	defer fmt.Println("read")
+
+	//io.Copy(os.Stdout, hr.Reader)
+	for {
+		data := make([]byte, 1)
+		n, err := hr.Reader.Read(data)
+		fmt.Println(n, data, err)
+	}
+
+	//output, err := ioutil.ReadAll(hr.Reader)
+	return nil, nil
+}
 
 func (c *Container) Run() (chan struct{}, error) {
-	ctx := context.Background()
-	if err := c.manager.ContainerStart(ctx, c.id, types.ContainerStartOptions{}); err != nil {
+	if err := c.manager.ContainerStart(context.Background(), c.Id, types.ContainerStartOptions{}); err != nil {
 		return nil, err
 	}
 
 	exited := make(chan struct{})
-	statusCh, errCh := c.manager.ContainerWait(ctx, c.id, container.WaitConditionNotRunning)
+	statusCh, errCh := c.manager.ContainerWait(context.Background(), c.Id, container.WaitConditionNotRunning)
 	go func() {
 		// TODO: handle leak
 		select {
@@ -94,15 +171,8 @@ func (c *Container) Run() (chan struct{}, error) {
 	}()
 
 	return exited, nil
-
-	//out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 }
 
 func (c *Container) Stop() error {
-	return c.manager.ContainerStop(context.Background(), c.id, nil)
+	return c.manager.ContainerStop(context.Background(), c.Id, nil)
 }
