@@ -14,7 +14,6 @@ type Worker struct {
 	alias    string
 	manager  *docker.Manager
 	dbDriver driver.Driver
-	dbServer *docker.DbServerContainer
 	exited   chan struct{}
 }
 
@@ -29,7 +28,6 @@ func (w *Worker) startDb() error {
 		return err
 	}
 
-	w.dbServer = dbServer
 	w.exited = exited
 
 	return nil
@@ -57,7 +55,10 @@ func New(id int, manager *docker.Manager) (*Worker, error) {
 }
 
 func (w *Worker) startClient() error {
-	dbDriver, err := driver.NewConsoleClientDriver(w.manager, w.name)
+	//endpoint, _ := url.Parse(fmt.Sprintf("http://%s:%d", w.alias, 8123))
+	//dbDriver := driver.NewHTTPDriver(endpoint)
+
+	dbDriver, err := driver.NewConsoleClientDriver(w.id, w.manager, w.name)
 	if err != nil {
 		return err
 	}

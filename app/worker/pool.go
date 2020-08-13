@@ -21,7 +21,6 @@ func NewPool(workersNum int) (*Pool, error) {
 	}
 	pool.manager = manager
 
-	//endpoint, _ := url.Parse(fmt.Sprintf("http://%s:%d", worker.alias, 8123))
 
 	pool.queue = queue.New(int64(workersNum))
 

@@ -1,18 +1,16 @@
 package docker
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
-	"io"
 )
 
 var dbServerImageName = "yandex/clickhouse-server"
-var dbClientImageName = "yandex/clickhouse-client"
+var dbClientImageName = "my-clickhouse-client"
 
 type Container struct {
 	manager *Manager
@@ -22,29 +20,35 @@ type Container struct {
 type DbServerContainer Container
 type DbClientContainer Container
 
-func NewDbServer(
-	port int,
+func NewExecutor(
 	manager *Manager,
 	alias string,
-	name string,
+	//name string,
 ) (*DbServerContainer, error) {
 	// TODO: can i move this configuration to dockerfile and import from it?
-	containerPort := nat.Port(fmt.Sprintf("%d/tcp", 8123))
-	hostPort := fmt.Sprintf("%d", port)
+	// TODO: load config
+	httpContainerPort := 8123
+	nativeContainerPort := 9000
+	restContainerPort := 8080
 
 	exposedPorts := nat.PortSet(
 		map[nat.Port]struct{}{
-			containerPort: {},
+			nat.Port(fmt.Sprintf("%d/tcp", httpContainerPort)):   {},
+			nat.Port(fmt.Sprintf("%d/tcp", nativeContainerPort)): {},
+			nat.Port(fmt.Sprintf("%d/tcp", restContainerPort)):   {},
 		},
 	)
 
-	portBindings := nat.PortMap(
-		map[nat.Port][]nat.PortBinding{
-			"8123/tcp": {nat.PortBinding{
-				HostPort: hostPort,
-			}},
-		},
-	)
+	//portBindings := nat.PortMap(
+	//	map[nat.Port][]nat.PortBinding{
+	//		nat.Port(fmt.Sprintf("%d/tcp", restContainerPort)): {nat.PortBinding{
+	//			HostPort: fmt.Sprintf("%d", restHostPort),
+	//		}},
+	//		nat.Port(fmt.Sprintf("%d/tcp", nativeContainerPort)): {nat.PortBinding{
+	//			HostPort: fmt.Sprintf("%d", nativeHostPort),
+	//		}},
+	//	},
+	//)
 
 	endpointsConfig := map[string]*network.EndpointSettings{
 		"clickhouse-playground_default": {
@@ -57,11 +61,12 @@ func NewDbServer(
 	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
 		Image:        dbServerImageName,
 		ExposedPorts: exposedPorts,
+		//Cmd:          []string{"-nm"},
 	}, &container.HostConfig{
-		PortBindings: portBindings,
-		NetworkMode:  "clickhouse-playground_default",
-		AutoRemove:   true,
-	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, name)
+		//PortBindings: portBindings,
+		NetworkMode: "clickhouse-playground_default",
+		AutoRemove:  true,
+	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, "")
 
 	if err != nil {
 		return nil, err
@@ -70,86 +75,115 @@ func NewDbServer(
 	return &DbServerContainer{manager, resp.ID}, nil
 }
 
-func NewDbClient(
-	manager *Manager,
-	backendName string,
-) (*DbClientContainer, error) {
-	// TODO: remove code duplication
-	//endpointsConfig := map[string]*network.EndpointSettings{
-	//	"clickhouse-playground_default": {
-	//		Aliases:             []string{alias},
-	//	},
-	//}
+//func NewDbClient(
+//	manager *Manager,
+//	backendName string,
+//	alias string,
+//) (*DbClientContainer, error) {
+//	// TODO: remove code duplication
+//	// TODO: can i move this configuration to dockerfile and import from it?
+//	execContainerPort := 9980
+//	//execHostPort := 9980
+//
+//	exposedPorts := nat.PortSet(
+//		map[nat.Port]struct{}{
+//			nat.Port(fmt.Sprintf("%d/tcp", execContainerPort)): {},
+//		},
+//	)
+//
+//	//portBindings := nat.PortMap(
+//	//	map[nat.Port][]nat.PortBinding{
+//	//		nat.Port(fmt.Sprintf("%d/tcp", execContainerPort)): {nat.PortBinding{
+//	//			HostPort: fmt.Sprintf("%d", execHostPort),
+//	//		}},
+//	//	},
+//	//)
+//
+//	endpointsConfig := map[string]*network.EndpointSettings{
+//		"clickhouse-playground_default": {
+//			Aliases: []string{alias},
+//		},
+//	}
+//
+//	fmt.Println("creating a container")
+//	// TODO: add restart policy
+//	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
+//		Image:        dbClientImageName,
+//		AttachStdin:  true,
+//		AttachStdout: true,
+//		AttachStderr: true,
+//		//Tty:          true,
+//		OpenStdin: true,
+//		Cmd: []string{
+//			"--port=9000",
+//			fmt.Sprintf("--host=%s", backendName),
+//			"-nm",
+//			"-f",
+//			"JSON",
+//		},
+//		ExposedPorts: exposedPorts,
+//	}, &container.HostConfig{
+//		// TODO: remove hardcode
+//		NetworkMode: "clickhouse-playground_default",
+//		//PortBindings: portBindings,
+//		//AutoRemove:  true,
+//		//Links:       []string{fmt.Sprintf("%s:%s", backendName, "clickhouse-server")},
+//	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, "")
+//
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return &DbClientContainer{manager, resp.ID}, nil
+//}
 
-	fmt.Println("creating a container")
-	// TODO: add restart policy
-	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
-		Image:        dbClientImageName,
-		AttachStdin:  true,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          true,
-		OpenStdin:    true,
-		Cmd: []string{
-			"--port=8123",
-			fmt.Sprintf("--host=%s", backendName),
-			"-nm",
-		},
-	}, &container.HostConfig{
-		// TODO: remove hardcode
-		NetworkMode: "clickhouse-playground_default",
-		AutoRemove:  true,
-		//Links:       []string{fmt.Sprintf("%s:%s", backendName, "clickhouse-server")},
-	}, nil, "")
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &DbClientContainer{manager, resp.ID}, nil
-}
-
-func (c *DbClientContainer) Write(input []byte) ([]byte, error) {
-	hr, err := c.manager.ContainerAttach(context.Background(), c.Id, types.ContainerAttachOptions{
-		Stream: true,
-		Stdin:  true,
-		Stdout: true,
-		Stderr: true,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("start writing", input)
-
-	n, err := io.Copy(hr.Conn, bytes.NewReader(input))
-	fmt.Printf("wrote %d bytes to connection\n", n)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if v, ok := hr.Conn.(interface{ CloseWrite() error }); ok {
-		fmt.Println("closing write")
-		v.CloseWrite()
-	} else {
-		fmt.Println("no such method")
-	}
-
-	fmt.Println("wrote")
-	defer fmt.Println("read")
-
-	//io.Copy(os.Stdout, hr.Reader)
-	for {
-		data := make([]byte, 1)
-		n, err := hr.Reader.Read(data)
-		fmt.Println(n, data, err)
-	}
-
-	//output, err := ioutil.ReadAll(hr.Reader)
-	return nil, nil
-}
+//func (c *DbClientContainer) Write(input []byte) ([]byte, error) {
+//	hr, err := c.manager.ContainerAttach(context.Background(), c.Id, types.ContainerAttachOptions{
+//		Stream: true,
+//		Stdin:  true,
+//		Stdout: true,
+//		Stderr: true,
+//	})
+//
+//	//out, err := c.manager.ContainerAttach(context.Background(), c.Id, types.ContainerAttachOptions{
+//	//	Stream: true,
+//	//	Stdout: true,
+//	//	Stderr: true,
+//	//})
+//
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	_, err = io.Copy(hr.Conn, bytes.NewReader(input))
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	fmt.Println("wrote")
+//
+//	//err = hr.CloseWrite()
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//
+//	then := time.Now().Add(7 * time.Second)
+//	hr.Conn.SetReadDeadline(then)
+//
+//	//io.Copy(os.Stdout, hr.Reader)
+//	//for i := 0; i < 100; i++ {
+//	//	data := make([]byte, 1)
+//	//	n, err := out.Reader.Read(data)
+//	//	fmt.Println(n, data, err)
+//	//}
+//
+//	// TODO: change strategy
+//	// TODO: handle error
+//	output, _ := ioutil.ReadAll(hr.Reader)
+//	//fmt.Println(string(output))
+//	return output, nil
+//	//return nil, nil
+//}
 
 func (c *Container) Run() (chan struct{}, error) {
 	if err := c.manager.ContainerStart(context.Background(), c.Id, types.ContainerStartOptions{}); err != nil {
