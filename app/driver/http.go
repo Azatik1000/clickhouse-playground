@@ -39,7 +39,7 @@ func (d *httpDriver) HealthCheck() error {
 func (d *httpDriver) Exec(query string) (string, error) {
 	response, err := http.Post(
 		d.endpoint.String(),
-		"",
+		"application/json",
 		strings.NewReader(query),
 	)
 	if err != nil {

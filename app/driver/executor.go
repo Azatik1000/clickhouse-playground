@@ -2,64 +2,91 @@ package driver
 
 import (
 	"app/docker"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
+	"strings"
+	"sync"
 )
 
-type consoleClientDriver struct {
-	client *docker.DbClientContainer
-	alias  string
+type executorDriver struct {
+	executor *docker.ExecutorContainer
+	endpoint *url.URL
 }
 
-func NewConsoleClientDriver(id int, manager *docker.Manager, backendName string) (Driver, error) {
-	var driver consoleClientDriver
-	driver.alias = fmt.Sprintf("client%d", id)
+var executorCount = 0
+var executorMu sync.Mutex
 
-	client, err := docker.NewDbClient(
+func NewExecutor(manager *docker.Manager) (Driver, error) {
+	var driver executorDriver
+
+	executorMu.Lock()
+	id := executorCount
+	executorCount++
+	executorMu.Unlock()
+
+	alias := fmt.Sprintf("client%d", id)
+
+	executor, err := docker.NewExecutor(
 		manager,
-		backendName,
-		driver.alias,
+		alias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = (*docker.Container)(executor).Run(); err != nil {
+		return nil, err
+	}
+
+
+	driver.executor = executor
+
+	endpoint, _ := url.Parse(
+		fmt.Sprintf("http://%s:%d/exec", alias, 8080),
 	)
 
-	if err != nil {
-		return nil, err
-	}
+	driver.endpoint = endpoint
 
-	_, err = (*docker.Container)(client).Run()
-	if err != nil {
-		return nil, err
-	}
-
-	driver.client = client
 	return &driver, nil
 }
 
-func (c *consoleClientDriver) Exec(query string) (string, error) {
+func (c *executorDriver) Exec(query string) (string, error) {
 	fmt.Println("Exec:", query)
-	endpoint, _ := url.Parse(
-		fmt.Sprintf("http://%s:%d", c.alias, 9980),
+
+	// TODO: change to json
+	response, err := http.Post(
+		c.endpoint.String(),
+		"",
+		strings.NewReader(query),
 	)
-	dbDriver := NewHTTPDriver(endpoint)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
-	//output, err := c.client.Write([]byte(query))
-	//runes := bytes.Runes(output)
-	//for _, r := range runes {
-	//	fmt.Print(string(r))
-	//}
-	//fmt.Println(string(output))
-	//fmt.Printf("%+q", output)
+	data, err := ioutil.ReadAll(response.Body)
+	if response.StatusCode != 200 {
+		return "", errors.New(string(data))
+	}
 
-	//return string(output), err
-	return dbDriver.Exec(query)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }
 
-func (c *consoleClientDriver) HealthCheck() error {
+func (c *executorDriver) HealthCheck() error {
 	// TODO: change
 	return nil
-	//panic("implement me")
 }
 
-func (c *consoleClientDriver) Close() error {
+func (c *executorDriver) Close() error {
 	// TODO: remove container
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
+	"io"
 	"log"
 	"net/http"
 )
@@ -71,26 +72,34 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := models.NewQuery(input.QueryStr)
-	found := s.storage.FindRun(query.Hash)
+	found := s.storage.FindRun(query)
 
+	var result models.Result
 	// This query was already run
 	if found != nil {
-
+		result = found.Result
+		fmt.Println("found cached")
 	} else {
+		result, err = s.pool.Execute(input.QueryStr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
+		// TODO: pointers ok?
+		s.storage.AddRun(&models.Run{
+			Query:  *query,
+			Result: result,
+		})
 	}
-	//sum := sha256.Sum256([]byte(input.QueryStr))
 
-	result, err := s.pool.Execute(input.QueryStr)
-	if err != nil {
+	if _, err = io.WriteString(w, string(result)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
-
-	encoder := json.NewEncoder(w)
-
-	if err = encoder.Encode(execOutput{Result: result}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	//encoder := json.NewEncoder(w)
+	//
+	//if err = encoder.Encode(execOutput{Result: result}); err != nil {
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//	return
+	//}
 }

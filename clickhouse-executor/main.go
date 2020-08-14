@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -26,24 +27,6 @@ func NewExecServer() (*ExecServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	//all, err := process.Processes()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//fmt.Println(all)
-
-	//p, err := process.NewProcess(int32(cmd.Process.Pid))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//children, err := p.Children()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//fmt.Println(children)
 	return &server, nil
 }
 
@@ -74,6 +57,7 @@ func (s *ExecServer) exec(query string) (string, error) {
 		return "", err
 	}
 
+	// TODO: handle errors
 	stdin.Close()
 	cmd.Wait()
 
@@ -129,18 +113,23 @@ type execInput struct {
 }
 
 func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
+	//decoder := json.NewDecoder(r.Body)
+	//
+	//var input execInput
+	//err := decoder.Decode(&input)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	return
+	//}
 
-	var input execInput
-	err := decoder.Decode(&input)
+	queryBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	query := string(queryBytes)
 
-	result, err := s.exec(input.QueryStr)
+	result, err := s.exec(query)
 	if err != nil {
-		//log.Fatal(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -153,6 +142,7 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	for {
 		err = d.Decode(&data)
 		if err != nil {
+			// TODO: handle EOF and others
 			fmt.Println(err)
 			break
 			//http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -176,14 +166,17 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 //}
 
 func main() {
+	fmt.Println("in main()")
 	server, err := NewExecServer()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	fmt.Println("created a server")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/exec", server.handleExec)
 	//mux.HandleFunc("/restart", server.handleRestart)
 
+	fmt.Println("ready to listen")
 	_ = http.ListenAndServe(":8080", mux)
 }

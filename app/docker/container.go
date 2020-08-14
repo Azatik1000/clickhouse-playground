@@ -9,22 +9,21 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
-var dbServerImageName = "yandex/clickhouse-server"
-var dbClientImageName = "my-clickhouse-client"
+var executorImageName = "clickhouse-executor"
+//var dbClientImageName = "my-clickhouse-client"
 
 type Container struct {
 	manager *Manager
 	Id      string
 }
 
-type DbServerContainer Container
+type ExecutorContainer Container
 type DbClientContainer Container
 
 func NewExecutor(
 	manager *Manager,
 	alias string,
-	//name string,
-) (*DbServerContainer, error) {
+) (*ExecutorContainer, error) {
 	// TODO: can i move this configuration to dockerfile and import from it?
 	// TODO: load config
 	httpContainerPort := 8123
@@ -59,20 +58,20 @@ func NewExecutor(
 	fmt.Println("creating a container")
 	// TODO: add restart policy
 	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
-		Image:        dbServerImageName,
+		Image:        executorImageName,
 		ExposedPorts: exposedPorts,
 		//Cmd:          []string{"-nm"},
 	}, &container.HostConfig{
 		//PortBindings: portBindings,
 		NetworkMode: "clickhouse-playground_default",
-		AutoRemove:  true,
-	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, "")
+		//AutoRemove:  true,
+	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, alias)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &DbServerContainer{manager, resp.ID}, nil
+	return &ExecutorContainer{manager, resp.ID}, nil
 }
 
 //func NewDbClient(

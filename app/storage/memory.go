@@ -10,13 +10,15 @@ type Memory struct {
 }
 
 func NewMemory() Storage {
-	return &Memory{}
+	return &Memory{
+		runs: make(map[[sha256.Size]byte]*models.Run),
+	}
 }
 
 func (m *Memory) AddRun(run *models.Run) {
 	m.runs[run.Query.Hash] = run
 }
 
-func (m *Memory) FindRun(hash [sha256.Size]byte) *models.Run {
-	return m.runs[hash]
+func (m *Memory) FindRun(query *models.Query) *models.Run {
+	return m.runs[query.Hash]
 }

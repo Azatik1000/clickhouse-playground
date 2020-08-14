@@ -12,7 +12,8 @@ class CodeExecutor extends React.Component {
     }
 
     handleResult(result) {
-        this.setState({result: result.data.result});
+        // console.log(result.data)
+        this.setState({result: JSON.stringify(result.data)});
     }
 
     render() {
@@ -55,12 +56,12 @@ class CodeForm extends React.Component {
     async handleSubmit(event) {
         const code = this.state.code;
         // alert(`Submitted ${this.state.value}`);
-        this.setState({value: ''});
+        // this.setState({value: ''});
         event.preventDefault();
 
         try {
             const response = await Axios.post("http://localhost:3999/exec", {
-                Query: code
+                query: code
             });
 
             this.props.onResult(response);

@@ -2,6 +2,7 @@ package worker
 
 import (
 	"app/docker"
+	"app/models"
 	"github.com/Workiva/go-datastructures/queue"
 	"sync"
 )
@@ -32,9 +33,8 @@ func NewPool(workersNum int) (*Pool, error) {
 	results := make(chan Result)
 
 	for i := 0; i < workersNum; i++ {
-		i := i
 		go func() {
-			w, err := New(i, pool.manager)
+			w, err := New(pool.manager)
 			results <- Result{w, err}
 		}()
 	}
@@ -78,17 +78,14 @@ func NewPool(workersNum int) (*Pool, error) {
 //	return nil
 //}
 
-func (p *Pool) Execute(query string) (string, error) {
+func (p *Pool) Execute(query string) (models.Result, error) {
 	// TODO: handle error
 	first, _ := p.queue.Get(1)
 	worker := first[0].(*Worker)
 
 	result, err := worker.Execute(query)
 	// TODO: handle error
-	go func() {
-		_ = worker.Restart()
-		p.queue.Put(worker)
-	}()
+	p.queue.Put(worker)
 
-	return result, err
+	return models.Result(result), err
 }
