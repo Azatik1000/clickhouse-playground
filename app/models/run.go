@@ -1,8 +1,11 @@
 package models
 
+import "github.com/jinzhu/gorm"
+
 type Result string
 
 type Run struct {
-	Query  Query
+	gorm.Model
+	Query  Query `gorm:"EMBEDDED"`
 	Result Result
 }

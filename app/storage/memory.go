@@ -15,10 +15,11 @@ func NewMemory() Storage {
 	}
 }
 
-func (m *Memory) AddRun(run *models.Run) {
+func (m *Memory) AddRun(run *models.Run) error {
 	m.runs[run.Query.Hash] = run
+	return nil
 }
 
-func (m *Memory) FindRun(query *models.Query) *models.Run {
-	return m.runs[query.Hash]
+func (m *Memory) FindRun(query *models.Query) (*models.Run, error) {
+	return m.runs[query.Hash], nil
 }

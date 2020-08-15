@@ -32,7 +32,11 @@ func main() {
 	sugar := logger.Sugar()
 	sugar.Info("starting")
 
-	s := storage.NewMemory()
+	s, err := storage.NewDatabase()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	pool, err := worker.NewPool(2)
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +76,7 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := models.NewQuery(input.QueryStr)
-	found := s.storage.FindRun(query)
+	found, err := s.storage.FindRun(query)
 
 	var result models.Result
 	// This query was already run
@@ -80,6 +84,7 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		result = found.Result
 		fmt.Println("found cached")
 	} else {
+		fmt.Println(err)
 		result, err = s.pool.Execute(input.QueryStr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

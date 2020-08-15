@@ -5,6 +5,6 @@ import (
 )
 
 type Storage interface {
-	AddRun(run *models.Run)
-	FindRun(query *models.Query) *models.Run
+	AddRun(run *models.Run) error
+	FindRun(query *models.Query) (*models.Run, error)
 }

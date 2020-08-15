@@ -1,16 +1,13 @@
 version: '3.7'
 services:
-#   db:
-    # image: yandex/clickhouse-server 
-    # ports: 
-    # - "8120:8123"
-    # - "9000:9000"
-  # client:
-  #   image: yandex/clickhouse-server
-  #   depends_on:
-  #   - db    
-  #   stdin_open: true
-  #   tty: true
+  db:
+    image: postgres
+    # restart: always
+    expose: 
+      - 5432
+    environment:
+      POSTGRES_PASSWORD: example
+      
   backend:
     build:
       context: app
@@ -18,10 +15,11 @@ services:
     - "3999:8080"
     volumes: 
     - "/var/run/docker.sock:/var/run/docker.sock"
-    # depends_on: 
-    # - db
-    # links:
-    # - db
+    depends_on: 
+      - db
+    links:
+      - db
+
   frontend:
     build:
       context: ./frontend/project
