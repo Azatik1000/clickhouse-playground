@@ -10,7 +10,7 @@ import (
 )
 
 var executorImageName = "clickhouse-executor"
-//var dbClientImageName = "my-clickhouse-client"
+var serverImageName = "yandex/clickhouse-server"
 
 type Container struct {
 	manager *Manager
@@ -59,6 +59,56 @@ func NewExecutor(
 	// TODO: add restart policy
 	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
 		Image:        executorImageName,
+		ExposedPorts: exposedPorts,
+		//Cmd:          []string{"-nm"},
+	}, &container.HostConfig{
+		//PortBindings: portBindings,
+		NetworkMode: "clickhouse-playground_default",
+		//AutoRemove:  true,
+	}, &network.NetworkingConfig{EndpointsConfig: endpointsConfig}, alias)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ExecutorContainer{manager, resp.ID}, nil
+}
+
+func NewServer(
+	manager *Manager,
+	alias string,
+) (*ExecutorContainer, error) {
+	// TODO: can i move this configuration to dockerfile and import from it?
+	// TODO: load config
+	nativeContainerPort := 9000
+
+	exposedPorts := nat.PortSet(
+		map[nat.Port]struct{}{
+			nat.Port(fmt.Sprintf("%d/tcp", nativeContainerPort)): {},
+		},
+	)
+
+	//portBindings := nat.PortMap(
+	//	map[nat.Port][]nat.PortBinding{
+	//		nat.Port(fmt.Sprintf("%d/tcp", restContainerPort)): {nat.PortBinding{
+	//			HostPort: fmt.Sprintf("%d", restHostPort),
+	//		}},
+	//		nat.Port(fmt.Sprintf("%d/tcp", nativeContainerPort)): {nat.PortBinding{
+	//			HostPort: fmt.Sprintf("%d", nativeHostPort),
+	//		}},
+	//	},
+	//)
+
+	endpointsConfig := map[string]*network.EndpointSettings{
+		"clickhouse-playground_default": {
+			Aliases: []string{alias},
+		},
+	}
+
+	fmt.Println("creating a container")
+	// TODO: add restart policy
+	resp, err := manager.ContainerCreate(context.Background(), &container.Config{
+		Image:        serverImageName,
 		ExposedPorts: exposedPorts,
 		//Cmd:          []string{"-nm"},
 	}, &container.HostConfig{

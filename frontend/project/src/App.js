@@ -13,6 +13,11 @@ class CodeExecutor extends React.Component {
 
     handleResult(result) {
         // console.log(result.data)
+        // var historyData = {"result": result};
+
+        // TODO: maybe change data?
+        window.history.pushState("lol", "", result.data.link);
+
         this.setState({result: JSON.stringify(result.data)});
     }
 
