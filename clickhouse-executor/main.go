@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,18 +16,13 @@ import (
 )
 
 type ExecServer struct {
-	dbServer *os.Process
-	dbClient *os.Process
-	mu       sync.Mutex
+	host string
+	mu   sync.Mutex
 }
 
-func NewExecServer() (*ExecServer, error) {
+func NewExecServer(host string) (*ExecServer, error) {
 	var server ExecServer
-
-	err := server.startDbServer()
-	if err != nil {
-		return nil, err
-	}
+	server.host = host
 	return &server, nil
 }
 
@@ -36,7 +32,13 @@ func (s *ExecServer) exec(query string) (string, error) {
 
 	fmt.Println("in exec")
 
-	cmd := exec.Command("/usr/bin/clickhouse", "client", "-nm", "-f", "JSON")
+	cmd := exec.Command(
+		"clickhouse-client",
+		fmt.Sprintf("--host=%s", s.host),
+		"-nm",
+		"-f",
+		"JSON",
+	)
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
@@ -59,53 +61,22 @@ func (s *ExecServer) exec(query string) (string, error) {
 
 	// TODO: handle errors
 	stdin.Close()
-	cmd.Wait()
 
-	return outb.String(), nil
-}
+	err = cmd.Wait()
+	//if err != nil {
+	//	return "", err
+	//}
 
-func (s *ExecServer) startDbServer() error {
-	cmd := exec.Command("/entrypoint.sh")
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	s.dbServer = cmd.Process
-
-	return nil
-}
-
-func (s *ExecServer) stopDbServer() error {
-	err := s.dbServer.Signal(os.Interrupt)
-	if err != nil {
-		return err
+	if err == nil {
+		return outb.String(), nil
 	}
 
-	// TODO: maybe handle state?
-	_, err = s.dbServer.Wait()
-	if err != nil {
-		return err
+	if _, ok := err.(*exec.ExitError); ok {
+		//stderr := string(errExit.Stderr)
+		return "", errors.New(errb.String())
 	}
 
-	cmd := exec.Command("rm", "-rf", "/data", "/metadata")
-	err = cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *ExecServer) restartDbServer() error {
-	if err := s.stopDbServer(); err != nil {
-		return err
-	}
-
-	if err := s.startDbServer(); err != nil {
-		return err
-	}
-
-	return nil
+	return "", err
 }
 
 type execInput struct {
@@ -113,15 +84,6 @@ type execInput struct {
 }
 
 func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
-	//decoder := json.NewDecoder(r.Body)
-	//
-	//var input execInput
-	//err := decoder.Decode(&input)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//	return
-	//}
-
 	queryBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -159,24 +121,16 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//func (s *ExecServer) handleRestart(w http.ResponseWriter, r *http.Request) {
-//	if err := s.restartDbServer(); err != nil {
-//		http.Error(w, err.Error(), http.StatusInternalServerError)
-//	}
-//}
-
 func main() {
-	fmt.Println("in main()")
-	server, err := NewExecServer()
+	host := os.Getenv("HOST")
+
+	server, err := NewExecServer(host)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("created a server")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/exec", server.handleExec)
-	//mux.HandleFunc("/restart", server.handleRestart)
 
-	fmt.Println("ready to listen")
 	_ = http.ListenAndServe(":8080", mux)
 }

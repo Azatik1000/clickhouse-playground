@@ -1,52 +1,23 @@
 package driver
 
 import (
-	"app/docker"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 )
 
 type executorDriver struct {
-	executor *docker.ExecutorContainer
 	endpoint *url.URL
 }
 
-var executorCount = 0
-var executorMu sync.Mutex
-
-func NewExecutor(manager *docker.Manager) (Driver, error) {
+func NewExecutor(endpointStr string) (Driver, error) {
 	var driver executorDriver
 
-	executorMu.Lock()
-	id := executorCount
-	executorCount++
-	executorMu.Unlock()
-
-	alias := fmt.Sprintf("client%d", id)
-
-	executor, err := docker.NewExecutor(
-		manager,
-		alias,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err = (*docker.Container)(executor).Run(); err != nil {
-		return nil, err
-	}
-
-
-	driver.executor = executor
-
-	endpoint, _ := url.Parse(
-		fmt.Sprintf("http://%s:%d/exec", alias, 8080),
-	)
+	// TODO: handle error
+	endpoint, _ := url.Parse(endpointStr)
 
 	driver.endpoint = endpoint
 

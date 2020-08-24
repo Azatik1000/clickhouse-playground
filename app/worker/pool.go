@@ -3,6 +3,7 @@ package worker
 import (
 	"app/docker"
 	"app/models"
+	"fmt"
 	"github.com/Workiva/go-datastructures/queue"
 	"sync"
 )
@@ -21,7 +22,6 @@ func NewPool(workersNum int) (*Pool, error) {
 		return nil, err
 	}
 	pool.manager = manager
-
 
 	pool.queue = queue.New(int64(workersNum))
 
@@ -51,33 +51,6 @@ func NewPool(workersNum int) (*Pool, error) {
 	return &pool, nil
 }
 
-//func (p *Pool) Start() error {
-//	var multiErr error
-//	var wg sync.WaitGroup
-//
-//	fmt.Println(p.queue.Len())
-//	for i := 0; i < int(p.queue.Len()); i++ {
-//		wg.Add(1)
-//		go func() {
-//			defer wg.Done()
-//			var err error
-//			// TODO: handle error
-//			first, _ := p.queue.Get(1)
-//			worker := first[0].(*Worker)
-//			err = worker.StartDb()
-//			multierr.AppendInto(&multiErr, err)
-//			p.queue.Put(worker)
-//		}()
-//	}
-//	wg.Wait()
-//
-//	if len(multierr.Errors(multiErr)) > 0 {
-//		return multiErr
-//	}
-//
-//	return nil
-//}
-
 func (p *Pool) Execute(query string) (models.Result, error) {
 	// TODO: handle error
 	first, _ := p.queue.Get(1)
@@ -85,7 +58,15 @@ func (p *Pool) Execute(query string) (models.Result, error) {
 
 	result, err := worker.Execute(query)
 	// TODO: handle error
-	p.queue.Put(worker)
+
+	go func() {
+		err := worker.restartServer()
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		p.queue.Put(worker)
+	}()
 
 	return models.Result(result), err
 }

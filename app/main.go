@@ -5,7 +5,6 @@ import (
 	"app/storage"
 	"app/worker"
 	"encoding/json"
-	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
@@ -88,9 +87,7 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	// This query 's been already run
 	if found != nil {
 		output.Cached = true
-
 		result = found.Result
-		fmt.Println("found cached")
 	} else {
 		output.Cached = false
 
