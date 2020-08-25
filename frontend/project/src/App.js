@@ -3,32 +3,114 @@ import Axios from 'axios';
 import logo from './logo.svg';
 import './App.css';
 
+import {useTable} from 'react-table'
+
 class CodeExecutor extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {result: ''};
+        this.state = {response: null};
 
-        this.handleResult = this.handleResult.bind(this);
+        this.handleResponse = this.handleResponse.bind(this);
     }
 
-    handleResult(result) {
+    handleResponse(response) {
         // console.log(result.data)
         // var historyData = {"result": result};
 
         // TODO: maybe change data?
-        window.history.pushState("lol", "", result.data.link);
+        // window.history.pushState("lol", "", response.data.link);
 
-        this.setState({result: JSON.stringify(result.data)});
+        this.setState({response: JSON.stringify(response.data)});
     }
 
     render() {
         return (
             <div>
-                <CodeForm onResult={this.handleResult}/>
-                <ResultView result={this.state.result}/>
+                <CodeForm onResponse={this.handleResponse}/>
+                <ResultView response={this.state.response}/>
             </div>
         )
     }
+}
+
+function Table(props) {
+    // console.log(props);
+    const {data} = props;
+    console.log(data.data);
+
+    const meta = data.meta
+
+    const columns = React.useMemo(() => {
+            return meta.map(kek => {
+                return {
+                    Header: kek.name,
+                    accessor: kek.name,
+                }
+                // console.log(kek);
+            });
+        },
+        [meta]
+    )
+
+    const tableInstance = useTable({columns, data: data.data});
+
+    const {
+        getTableProps,
+        getTableBodyProps,
+        headerGroups,
+        rows,
+        prepareRow,
+    } = tableInstance
+
+    return (
+        <table {...getTableProps()}>
+            <thead>
+            {
+                headerGroups.map(headerGroup => (
+                    <tr {...headerGroup.getHeaderGroupProps()}>
+                        {
+                            headerGroup.headers.map(column => (
+                                <th {...column.getHeaderProps()}>
+                                    {
+                                        column.render('Header')
+                                    }
+                                </th>
+                            ))
+                        }
+                    </tr>
+                ))
+            }
+            </thead>
+            <tbody {...getTableBodyProps()}>
+            {
+                rows.map(row => {
+                    prepareRow(row)
+
+                    return (
+                        <tr {...row.getRowProps()}>
+                            {
+                                row.cells.map(cell => {
+                                    return (
+                                        <td
+                                            {...cell.getCellProps()}
+                                            style={{
+                                                padding: '10px',
+                                                border: 'solid 1px gray',
+                                                background: 'papayawhip',
+                                            }}
+                                        >
+                                            {cell.render('Cell')}
+                                        </td>
+                                    )
+                                })
+                            }
+                        </tr>
+                    )
+                })
+            }
+            </tbody>
+        </table>
+    )
 }
 
 class ResultView extends React.Component {
@@ -37,10 +119,22 @@ class ResultView extends React.Component {
     }
 
     render() {
+        // TODO: maybe change init value from null to something else
+        if (this.props.response === null) {
+            return (
+                <p>No results yet</p>
+            )
+        }
+
+        const results = JSON.parse(this.props.response).result;
+
         return (
-            <p>
-                {this.props.result}
-            </p>
+            <div>
+                <p>
+                    {this.props.response}
+                </p>
+                <Table data={results[0]}/>
+            </div>
         )
     }
 }
@@ -69,7 +163,7 @@ class CodeForm extends React.Component {
                 query: code
             });
 
-            this.props.onResult(response);
+            this.props.onResponse(response);
         } catch (e) {
             console.log(e);
         }
