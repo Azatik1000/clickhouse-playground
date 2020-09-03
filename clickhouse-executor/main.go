@@ -2,14 +2,20 @@ package main
 
 import (
 	"bytes"
+	"github.com/shirou/gopsutil/process"
+	"time"
+
+	//"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -96,6 +102,30 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	go func() {
+		processes, err := process.Processes()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, p := range processes {
+			cmd, err := p.Cmdline()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if cmd == "/pause" || cmd == "/clickhouse-executor" {
+				continue
+			} else {
+				fmt.Println("gonna kill", p.Pid, cmd)
+				p.Kill() // TODO: maybe more gracefully?
+			}
+		}
+
+		fmt.Printf("%+v\n", processes)
+		time.Sleep(10 * time.Second)
+	}()
+
 	list := make([]map[string]interface{}, 0)
 
 	data := make(map[string]interface{})
@@ -122,7 +152,29 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	host := os.Getenv("HOST")
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//for {
+	//	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	fmt.Printf("%+v\n", pods)
+	//
+	//	time.Sleep(10 * time.Second)
+	//}
+
+	//host := os.Getenv("HOST")
+	host := "localhost"
 
 	server, err := NewExecServer(host)
 	if err != nil {
