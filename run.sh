@@ -4,6 +4,9 @@ if ! minikube status; then
     minikube start --vm-driver=virtualbox
 fi
 
+kubectl delete -f clickhouse-service.yaml
+kubectl delete -f app-service.yaml
+
 eval $(minikube docker-env)
 
 cd app
@@ -14,6 +17,5 @@ cd clickhouse-executor
 docker build -t clickhouse-executor .
 cd ..
 
-kubectl delete -f clickhouse-service.yaml
 kubectl create -f clickhouse-service.yaml
-
+kubectl create -f app-service.yaml

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"app/driver"
 	"app/models"
 	"app/storage"
-	"app/worker"
 	"encoding/json"
+	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
@@ -14,12 +15,12 @@ import (
 )
 
 type pgServer struct {
-	pool    *worker.Pool
+	driver  driver.Driver
 	storage storage.Storage
 }
 
-func newPgServer(pool *worker.Pool, s storage.Storage) *pgServer {
-	return &pgServer{pool: pool, storage: s}
+func newPgServer(driver driver.Driver, s storage.Storage) *pgServer {
+	return &pgServer{driver: driver, storage: s}
 }
 
 func main() {
@@ -31,18 +32,13 @@ func main() {
 	sugar := logger.Sugar()
 	sugar.Info("starting")
 
-	s, err := storage.NewDatabase()
-	if err != nil {
-		log.Fatal(err)
-	}
+	s := storage.NewMemory()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
-	pool, err := worker.NewPool(2)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("created pool successfully")
-
-	server := newPgServer(pool, s)
+	driver, err := driver.NewExecutor("http://clickhouse-service:8080/exec")
+	server := newPgServer(driver, s)
 
 	c := cors.Default()
 
@@ -75,6 +71,8 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("read your query")
+
 	var output execOutput
 
 	query := models.NewQuery(input.QueryStr)
@@ -91,7 +89,9 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	} else {
 		output.Cached = false
 
-		result, err = s.pool.Execute(input.QueryStr)
+		fmt.Println("sending your query to driver")
+
+		result, err = s.driver.Exec(input.QueryStr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

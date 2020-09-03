@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"app/models"
 	"bytes"
 	"errors"
 	"fmt"
@@ -36,7 +37,7 @@ func (d *httpDriver) HealthCheck() error {
 	return nil
 }
 
-func (d *httpDriver) Exec(query string) (string, error) {
+func (d *httpDriver) Exec(query string) (models.Result, error) {
 	response, err := http.Post(
 		d.endpoint.String(),
 		"application/json",
@@ -58,7 +59,7 @@ func (d *httpDriver) Exec(query string) (string, error) {
 		return "", err
 	}
 
-	return string(data), nil
+	return models.Result(data), nil
 }
 
 func (d *httpDriver) Close() error {

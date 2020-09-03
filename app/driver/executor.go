@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"app/models"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -24,10 +25,10 @@ func NewExecutor(endpointStr string) (Driver, error) {
 	return &driver, nil
 }
 
-func (c *executorDriver) Exec(query string) (string, error) {
+func (c *executorDriver) Exec(query string) (models.Result, error) {
 	fmt.Println("Exec:", query)
 
-	// TODO: change to json
+	// TODO: maybe change to json
 	response, err := http.Post(
 		c.endpoint.String(),
 		"",
@@ -49,7 +50,7 @@ func (c *executorDriver) Exec(query string) (string, error) {
 		return "", err
 	}
 
-	return string(data), nil
+	return models.Result(data), nil
 }
 
 func (c *executorDriver) HealthCheck() error {

@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"github.com/shirou/gopsutil/process"
-	"time"
-
 	//"context"
 	"encoding/json"
 	"errors"
@@ -55,6 +53,8 @@ func (s *ExecServer) exec(query string) (string, error) {
 		return "", err
 	}
 
+	fmt.Println("starting clickhouse-client")
+
 	err = cmd.Start()
 	if err != nil {
 		return "", err
@@ -72,6 +72,8 @@ func (s *ExecServer) exec(query string) (string, error) {
 	//if err != nil {
 	//	return "", err
 	//}
+
+	fmt.Println("clickhouse-client ended")
 
 	if err == nil {
 		return outb.String(), nil
@@ -95,6 +97,8 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	query := string(queryBytes)
+
+	fmt.Println("read your query")
 
 	result, err := s.exec(query)
 	if err != nil {
@@ -121,9 +125,6 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 				p.Kill() // TODO: maybe more gracefully?
 			}
 		}
-
-		fmt.Printf("%+v\n", processes)
-		time.Sleep(10 * time.Second)
 	}()
 
 	list := make([]map[string]interface{}, 0)
