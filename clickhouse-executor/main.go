@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	"github.com/shirou/gopsutil/process"
+	"github.com/streadway/amqp"
+	"time"
+
 	//"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"net/http"
@@ -152,16 +153,64 @@ func (s *ExecServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	config, err := rest.InClusterConfig()
+func readFromQueue(conn *amqp.Connection) error {
+	ch, err := conn.Channel()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	_, err = kubernetes.NewForConfig(config)
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		"hello", // name
+		false,   // durable
+		false,   // delete when unused
+		false,   // exclusive
+		false,   // no-wait
+		nil,     // arguments
+	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	err = ch.Qos(
+		1,     // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+
+	msgs, err := ch.Consume(
+		q.Name, // queue
+		"",     // consumer
+		false,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+	if err != nil {
+		return err
+	}
+
+	for d := range msgs {
+		log.Printf("Received a message: %s", d.Body)
+		time.Sleep(10 * time.Second)
+		d.Ack(false)
+	}
+
+	return nil
+}
+
+func main() {
+	//config, err := rest.InClusterConfig()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//_, err = kubernetes.NewForConfig(config)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	//for {
 	//	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
@@ -173,6 +222,16 @@ func main() {
 	//
 	//	time.Sleep(10 * time.Second)
 	//}
+
+	s := "amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672"
+	conn, err := amqp.Dial(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer conn.Close()
+
+	go readFromQueue(conn)
 
 	//host := os.Getenv("HOST")
 	host := "localhost"

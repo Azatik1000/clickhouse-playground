@@ -3,7 +3,8 @@ kind: Service
 metadata:
     name: app-service
     labels:
-        app: app
+        app: clickhouse-playground
+        component: app
 spec:
     type: NodePort
     ports:
@@ -12,7 +13,8 @@ spec:
         nodePort: 30002
         targetPort: 8080
     selector:
-        app: app
+        app: clickhouse-playground
+        component: app
 ---    
 apiVersion: apps/v1
 kind: Deployment
@@ -21,12 +23,14 @@ metadata:
 spec:
     selector:
         matchLabels:
-            app: app
+            app: clickhouse-playground
+            component: app
     replicas: 1
     template:
         metadata:
             labels:
-                app: app
+                app: clickhouse-playground
+                component: app
         spec:
             containers:
               - name: app

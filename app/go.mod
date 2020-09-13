@@ -16,6 +16,7 @@ require (
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/rs/cors v1.7.0
 	github.com/sirupsen/logrus v1.6.0 // indirect
+	github.com/streadway/amqp v1.0.0 // indirect
 	go.uber.org/multierr v1.5.0
 	go.uber.org/zap v1.14.1
 	google.golang.org/grpc v1.31.0 // indirect
