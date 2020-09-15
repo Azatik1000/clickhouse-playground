@@ -75,19 +75,12 @@ func main() {
 	sugar := logger.Sugar()
 	sugar.Info("starting")
 
-	conn, err := amqp.Dial("amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	go sendToQueue(conn)
-
 	s := storage.NewMemory()
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 
-	driver, err := driver.NewExecutor("http://clickhouse-service:8080/exec")
+	driver, err := driver.NewExecutor("amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672")
 	server := newPgServer(driver, s)
 
 	c := cors.Default()

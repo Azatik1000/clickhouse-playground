@@ -2,63 +2,132 @@ package driver
 
 import (
 	"app/models"
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strings"
+	"github.com/google/uuid"
+	"github.com/streadway/amqp"
+	"log"
 )
 
-type executorDriver struct {
-	endpoint *url.URL
+type request struct {
+	id     uuid.UUID
+	query  string
+	result chan models.Result
 }
 
-func NewExecutor(endpointStr string) (Driver, error) {
+type executorDriver struct {
+	mqConn           *amqp.Connection
+	mqChan           *amqp.Channel
+	sendQueueName    string
+	receiveQueueName string
+	requests         map[uuid.UUID]*request
+}
+
+func NewExecutor(mqHost string, sendQueueName string) (Driver, error) {
 	var driver executorDriver
 
-	// TODO: handle error
-	endpoint, _ := url.Parse(endpointStr)
+	mqConn, err := amqp.Dial(mqHost)
+	if err != nil {
+		log.Fatal(err)
+	}
+	driver.mqConn = mqConn
 
-	driver.endpoint = endpoint
+	ch, err := mqConn.Channel()
+	if err != nil {
+		return nil, err
+	}
+	driver.mqChan = ch
+
+	_, err = ch.QueueDeclare(
+		sendQueueName,
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	driver.sendQueueName = sendQueueName
+
+	receiveQueue, err := ch.QueueDeclare(
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	driver.receiveQueueName = receiveQueue.Name
+
+	go driver.handleResponses()
 
 	return &driver, nil
 }
 
-func (c *executorDriver) Exec(query string) (models.Result, error) {
-	fmt.Println("Exec:", query)
-
-	// TODO: maybe change to json
-	response, err := http.Post(
-		c.endpoint.String(),
-		"",
-		strings.NewReader(query),
+func (d *executorDriver) handleResponses() error {
+	responseMsgs, err := d.mqChan.Consume(
+		d.receiveQueueName, // queue
+		"",                 // consumer
+		true,               // auto-ack
+		false,              // exclusive
+		false,              // no-local
+		false,              // no-wait
+		nil,                // args
 	)
 	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
-	data, err := ioutil.ReadAll(response.Body)
-	if response.StatusCode != 200 {
-		return "", errors.New(string(data))
+		return err
 	}
 
+	for responseMsg := range responseMsgs {
+		responseMsg.Body
+	}
+}
+
+func (d *executorDriver) newRequest(query string) *request {
+	request := &request{query: query, result: make(chan models.Result)}
+
+	id := uuid.New()
+	d.requests[id] = request
+
+	return request
+}
+
+func (d *executorDriver) sendRequest(request *request) error {
+	return d.mqChan.Publish(
+		"",          // exchange
+		"rpc_queue", // routing key
+		false,       // mandatory
+		false,       // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			CorrelationId: request.id.String(),
+			ReplyTo:       d.receiveQueueName,
+			Body:          []byte(request.query),
+		},
+	)
+}
+
+func (d *executorDriver) Exec(query string) (models.Result, error) {
+	request := d.newRequest(query)
+
+	err := d.sendRequest(request)
 	if err != nil {
 		return "", err
 	}
 
-	return models.Result(data), nil
+	result := <-request.result
+	return result, nil
 }
 
-func (c *executorDriver) HealthCheck() error {
+func (d *executorDriver) HealthCheck() error {
 	// TODO: change
 	return nil
 }
 
-func (c *executorDriver) Close() error {
-	// TODO: remove container
-	return nil
+func (d *executorDriver) Close() error {
+	d.mqChan.Close()
+	return d.mqConn.Close()
 }
