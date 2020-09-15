@@ -1,23 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"github.com/shirou/gopsutil/process"
 	"github.com/streadway/amqp"
-	"time"
-
-	//"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"io/ioutil"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
-	"net/http"
-	"os/exec"
-	"strings"
-	"sync"
 )
 
 type ExecServer struct {
@@ -68,8 +53,54 @@ func NewExecServer(
 	return &server, nil
 }
 
+func (s *ExecServer) handleRequestMsg(requestMsg amqp.Delivery) error {
+	// TODO: handle error
+	result, _ := s.executor.exec(string(requestMsg.Body))
+
+	err := s.mqChan.Publish(
+		"",                 // exchange
+		requestMsg.ReplyTo, // routing key
+		false,              // mandatory
+		false,              // immediate
+		amqp.Publishing{
+			ContentType:   "application/json",
+			CorrelationId: requestMsg.CorrelationId,
+			Body:          []byte(result),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	requestMsg.Ack(false)
+	return nil
+}
+
 func (s *ExecServer) handleRequests() error {
-	
+	err := s.mqChan.Qos(
+		1,     // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+	if err != nil {
+		return err
+	}
+
+	requestMsgs, err := s.mqChan.Consume(
+		s.receiveQueueName,
+		"",    // consumer
+		false, // auto-ack
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,   // args
+	)
+
+	for requestMsg := range requestMsgs {
+		s.handleRequestMsg(requestMsg)
+	}
+
+	return nil
 }
 
 func main() {
@@ -83,5 +114,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-
+	// infinite
+	server.handleRequests()
 }

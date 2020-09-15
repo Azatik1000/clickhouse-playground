@@ -67,6 +67,16 @@ func NewExecutor(mqHost string, sendQueueName string) (Driver, error) {
 	return &driver, nil
 }
 
+func (d *executorDriver) handleResponseMsg(responseMsg amqp.Delivery) error {
+	id, err := uuid.FromBytes([]byte(responseMsg.CorrelationId))
+	if err != nil {
+		return err
+	}
+
+	d.requests[id].result <- models.Result(responseMsg.Body)
+	return nil
+}
+
 func (d *executorDriver) handleResponses() error {
 	responseMsgs, err := d.mqChan.Consume(
 		d.receiveQueueName, // queue
@@ -82,8 +92,10 @@ func (d *executorDriver) handleResponses() error {
 	}
 
 	for responseMsg := range responseMsgs {
-		responseMsg.Body
+		d.handleResponseMsg(responseMsg)
 	}
+
+	return nil
 }
 
 func (d *executorDriver) newRequest(query string) *request {
@@ -97,10 +109,10 @@ func (d *executorDriver) newRequest(query string) *request {
 
 func (d *executorDriver) sendRequest(request *request) error {
 	return d.mqChan.Publish(
-		"",          // exchange
-		"rpc_queue", // routing key
-		false,       // mandatory
-		false,       // immediate
+		"",              // exchange
+		d.sendQueueName, // routing key
+		false,           // mandatory
+		false,           // immediate
 		amqp.Publishing{
 			ContentType:   "text/plain",
 			CorrelationId: request.id.String(),

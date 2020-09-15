@@ -80,7 +80,10 @@ func main() {
 	//	log.Fatal(err)
 	//}
 
-	driver, err := driver.NewExecutor("amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672")
+	driver, err := driver.NewExecutor(
+		"amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672",
+		"hello",
+	)
 	server := newPgServer(driver, s)
 
 	c := cors.Default()
@@ -152,14 +155,4 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(output)
-	//if _, err = io.WriteString(w, string(result)); err != nil {
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//}
-
-	//encoder := json.NewEncoder(w)
-	//
-	//if err = encoder.Encode(execOutput{Result: result}); err != nil {
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
 }
