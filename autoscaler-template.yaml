@@ -4,6 +4,7 @@ metadata:
   name: rabbitmq-consumer-secret
 data:
   RabbitMqHost: YW1xcDovL3VzZXI6REZ4b0ZHUzJpM0BteS1yZWxlYXNlLXJhYmJpdG1xOjU2NzI=
+{{range .Versions}}
 ---
 apiVersion: keda.k8s.io/v1alpha1
 kind: ScaledObject
@@ -11,10 +12,10 @@ metadata:
   name: rabbitmq-consumer
   namespace: default
   labels:
-    deploymentName: clickhouse-deployment
+    deploymentName: clickhouse-{{.Id}}-deployment
 spec:
   scaleTargetRef:
-    deploymentName: clickhouse-deployment
+    deploymentName: clickhouse-{{.Id}}-deployment
   pollingInterval: 2 # Optional. Default: 30 seconds
   cooldownPeriod: 30 # Optional. Default: 300 seconds
   minReplicaCount: 1
@@ -22,10 +23,11 @@ spec:
   triggers:
     - type: rabbitmq
       metadata:
-        queueName: hello
+        queueName: execution-{{.Id}}
         queueLength: "5" # TODO: research this param
       authenticationRef:
         name: rabbitmq-consumer-trigger
+{{end}}
 ---
 apiVersion: keda.k8s.io/v1alpha1
 kind: TriggerAuthentication

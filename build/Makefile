@@ -8,17 +8,19 @@ EXECUTOR_DIRECTORY = ../executor
 EXECUTOR_FILES = $(wildcard ../executor/*)
 
 deploy: gke-connect install-rabbitmq app-docker executor-docker # install-keda
-	kubectl create -f ../clickhouse-service.yaml
+	kubectl create -f ../executor-deployment.yaml
 	kubectl create -f ../app-service.yaml
-	kubectl create -f ../autoscaler.yaml
+	# kubectl create -f ../autoscaler.yaml
 
 tear-down:
-	kubectl delete -f ../clickhouse-service.yaml
+	kubectl delete -f ../executor-deployment.yaml
 	kubectl delete -f ../app-service.yaml
-	kubectl delete TriggerAuthentication rabbitmq-consumer-trigger
-	kubectl delete ScaledObject rabbitmq-consumer
-	# kubectl delete deploy rabbitmq-consumer
-	kubectl delete secret rabbitmq-consumer-secret
+	# kubectl delete TriggerAuthentication rabbitmq-consumer-trigger
+	# kubectl delete ScaledObject rabbitmq-consumer
+	# kubectl delete secret rabbitmq-consumer-secret
+
+configure-deployment:
+	go run ../templater/main.go
 
 install-keda: gke-connect
 	helm repo add kedacore https://kedacore.github.io/charts
