@@ -8,7 +8,6 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
-	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
@@ -22,48 +21,6 @@ type pgServer struct {
 
 func newPgServer(driver driver.Driver, s storage.Storage) *pgServer {
 	return &pgServer{driver: driver, storage: s}
-}
-
-func sendToQueue(conn *amqp.Connection) error {
-	ch, err := conn.Channel()
-	if err != nil {
-		return err
-	}
-
-	defer ch.Close()
-
-	q, err := ch.QueueDeclare(
-		"hello",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return err
-	}
-
-	body := "Hello World!"
-
-	for i := 0; i < 500; i++ {
-		err = ch.Publish(
-			"",     // exchange
-			q.Name, // routing key
-			false,  // mandatory
-			false,  // immediate
-			amqp.Publishing{
-				ContentType: "text/plain",
-				Body:        []byte(body),
-			},
-		)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func main() {
@@ -81,7 +38,7 @@ func main() {
 	//}
 
 	driver, err := driver.NewExecutor(
-		"amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672",
+		"amqp://user:BH91UBcffL@my-release-rabbitmq:5672",
 		"hello",
 	)
 	server := newPgServer(driver, s)

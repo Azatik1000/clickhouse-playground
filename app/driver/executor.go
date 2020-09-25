@@ -62,18 +62,30 @@ func NewExecutor(mqHost string, sendQueueName string) (Driver, error) {
 	}
 	driver.receiveQueueName = receiveQueue.Name
 
-	go driver.handleResponses()
+	driver.requests = make(map[uuid.UUID]*request)
+
+	go func() {
+		err := driver.handleResponses()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	return &driver, nil
 }
 
 func (d *executorDriver) handleResponseMsg(responseMsg amqp.Delivery) error {
-	id, err := uuid.FromBytes([]byte(responseMsg.CorrelationId))
+	log.Printf("got correlationId=%s\n", responseMsg.CorrelationId)
+	id, err := uuid.Parse(responseMsg.CorrelationId)
 	if err != nil {
 		return err
 	}
 
+	log.Printf("got response with id=%s\n", id.String())
+
 	d.requests[id].result <- models.Result(responseMsg.Body)
+	// TODO: remove from map
+
 	return nil
 }
 
@@ -92,22 +104,29 @@ func (d *executorDriver) handleResponses() error {
 	}
 
 	for responseMsg := range responseMsgs {
-		d.handleResponseMsg(responseMsg)
+		err := d.handleResponseMsg(responseMsg)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (d *executorDriver) newRequest(query string) *request {
-	request := &request{query: query, result: make(chan models.Result)}
+	request := &request{
+		id: uuid.New(),
+		query: query,
+		result: make(chan models.Result),
+	}
 
-	id := uuid.New()
-	d.requests[id] = request
-
+	d.requests[request.id] = request
 	return request
 }
 
 func (d *executorDriver) sendRequest(request *request) error {
+	log.Printf("sending with id=%s\n", request.id.String())
+
 	return d.mqChan.Publish(
 		"",              // exchange
 		d.sendQueueName, // routing key
@@ -130,7 +149,9 @@ func (d *executorDriver) Exec(query string) (models.Result, error) {
 		return "", err
 	}
 
+	log.Println("waiting on channel")
 	result := <-request.result
+	log.Println("got result from channel")
 	return result, nil
 }
 

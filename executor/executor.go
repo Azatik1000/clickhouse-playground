@@ -10,12 +10,11 @@ import (
 	"log"
 	"os/exec"
 	"strings"
-	"sync"
 )
 
 type executor struct {
 	host string
-	mu   sync.Mutex
+	//mu   sync.Mutex
 }
 
 func NewExecutor(host string) (*executor, error) {
@@ -26,8 +25,8 @@ func NewExecutor(host string) (*executor, error) {
 
 func (e *executor) runProcess(query string) (string, error) {
 	// TODO: mutexes are incorrect
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	//e.mu.Lock()
+	//defer e.mu.Unlock()
 
 	fmt.Println("in exec")
 

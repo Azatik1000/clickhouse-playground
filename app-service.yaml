@@ -6,11 +6,11 @@ metadata:
         app: clickhouse-playground
         component: app
 spec:
-    type: NodePort
+    type: LoadBalancer 
     ports:
-      - port: 3999
-        protocol: TCP
-        nodePort: 30002
+      - port: 80
+        # protocol: TCP
+        # nodePort: 30002
         targetPort: 8080
     selector:
         app: clickhouse-playground
@@ -34,7 +34,6 @@ spec:
         spec:
             containers:
               - name: app
-                image: app
-                imagePullPolicy: Never
+                image: gcr.io/avid-life-273910/app
                 ports:
                   - containerPort: 8080

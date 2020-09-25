@@ -17,12 +17,13 @@ spec:
     deploymentName: clickhouse-deployment
   pollingInterval: 2 # Optional. Default: 30 seconds
   cooldownPeriod: 30 # Optional. Default: 300 seconds
+  minReplicaCount: 1
   maxReplicaCount: 10 # Optional. Default: 100
   triggers:
     - type: rabbitmq
       metadata:
         queueName: hello
-        queueLength: "5"
+        queueLength: "5" # TODO: research this param
       authenticationRef:
         name: rabbitmq-consumer-trigger
 ---

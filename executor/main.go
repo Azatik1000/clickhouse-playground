@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/streadway/amqp"
 	"log"
 )
@@ -56,6 +57,8 @@ func NewExecServer(
 func (s *ExecServer) handleRequestMsg(requestMsg amqp.Delivery) error {
 	// TODO: handle error
 	result, _ := s.executor.exec(string(requestMsg.Body))
+	fmt.Println(result)
+	//_ = result
 
 	err := s.mqChan.Publish(
 		"",                 // exchange
@@ -65,7 +68,7 @@ func (s *ExecServer) handleRequestMsg(requestMsg amqp.Delivery) error {
 		amqp.Publishing{
 			ContentType:   "application/json",
 			CorrelationId: requestMsg.CorrelationId,
-			Body:          []byte(result),
+			Body:          []byte("{}"),
 		},
 	)
 	if err != nil {
@@ -104,9 +107,10 @@ func (s *ExecServer) handleRequests() error {
 }
 
 func main() {
+	// TODO: move user/pass to config
 	server, err := NewExecServer(
 		"localhost",
-		"amqp://user:DFxoFGS2i3@my-release-rabbitmq:5672",
+		"amqp://user:BH91UBcffL@my-release-rabbitmq:5672",
 		"hello",
 	)
 
