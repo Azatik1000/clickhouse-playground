@@ -15,7 +15,7 @@ type httpDriver struct {
 	endpoint *url.URL
 }
 
-func NewHTTPDriver(endpoint *url.URL) Driver {
+func NewHTTPDriver(endpoint *url.URL) *httpDriver {
 	return &httpDriver{endpoint: endpoint}
 }
 

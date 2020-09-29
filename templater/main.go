@@ -16,7 +16,7 @@ type Version struct {
 var executorDeploymentTemplateFileName = "../executor-deployment-template.yaml"
 var executorDeploymentsFileName = "../executor-deployments.yaml"
 
-var autoscalerTemplateFileName =  "../autoscaler-template.yaml"
+var autoscalerTemplateFileName = "../autoscaler-template.yaml"
 var autoscalersFileName = "../autoscalers.yaml"
 
 func main() {
@@ -37,12 +37,23 @@ func main() {
 
 	executorDeploymentTemplate, err := template.New(path.Base(executorDeploymentTemplateFileName)).
 		ParseFiles(executorDeploymentTemplateFileName)
-	executorDeploymentsFile, err := os.OpenFile(executorDeploymentsFileName, os.O_WRONLY | os.O_CREATE, 0644)
+	executorDeploymentsFile, err := os.OpenFile(
+		executorDeploymentsFileName,
+		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
+		0644,
+	)
 	if err := executorDeploymentTemplate.Execute(executorDeploymentsFile, data); err != nil {
 		log.Fatal(err)
 	}
 
-	
-
-
+	autoscalerTemplate, err := template.New(path.Base(autoscalerTemplateFileName)).
+		ParseFiles(autoscalerTemplateFileName)
+	autoscalersFile, err := os.OpenFile(
+		autoscalersFileName,
+		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
+		0644,
+	)
+	if err := autoscalerTemplate.Execute(autoscalersFile, data); err != nil {
+		log.Fatal(err)
+	}
 }

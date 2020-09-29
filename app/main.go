@@ -8,7 +8,6 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/rs/cors"
-	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"strings"
@@ -24,23 +23,19 @@ func newPgServer(driver driver.Driver, s storage.Storage) *pgServer {
 }
 
 func main() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	sugar := logger.Sugar()
-	sugar.Info("starting")
-
 	s := storage.NewMemory()
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 
 	driver, err := driver.NewExecutor(
-		"amqp://user:BH91UBcffL@my-release-rabbitmq:5672",
-		"hello",
+		"amqp://user:4Pb4iaav1K@my-release-rabbitmq:5672",
+		"results",
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	server := newPgServer(driver, s)
 
 	c := cors.Default()
@@ -54,7 +49,8 @@ func main() {
 }
 
 type execInput struct {
-	QueryStr string `json:"query"`
+	QueryStr  string `json:"query"`
+	VersionID string `json:"versionID"`
 }
 
 type execOutput struct {
@@ -74,27 +70,30 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("read your query")
+	log.Println("read your query")
 
 	var output execOutput
 
 	query := models.NewQuery(input.QueryStr)
 	// TODO: move to getlink method
 	output.Link = "/runs/" + query.Hash.Hex()
-	found, err := s.storage.FindRun(query)
 
-	var result models.Result
+	// TODO: check version
+	//found, err := s.storage.FindRun(query)
+	var found *models.Run = nil
+
+	var result *models.Result
 
 	// This query 's been already run
 	if found != nil {
 		output.Cached = true
-		result = found.Result
+		result = &found.Result
 	} else {
 		output.Cached = false
 
 		fmt.Println("sending your query to driver")
 
-		result, err = s.driver.Exec(input.QueryStr)
+		result, err = s.driver.Exec(input.QueryStr, input.VersionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -103,11 +102,11 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 		// TODO: pointers ok?
 		s.storage.AddRun(&models.Run{
 			Query:  *query,
-			Result: result,
+			Result: *result,
 		})
 	}
 
-	d := json.NewDecoder(strings.NewReader(string(result)))
+	d := json.NewDecoder(strings.NewReader(string(*result)))
 	d.Decode(&output.Result)
 
 	encoder := json.NewEncoder(w)

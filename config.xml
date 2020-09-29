@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<yandex>
+    <!-- <http_port>8663</http_port> -->
+    <disable_internal_dns_cache>1</disable_internal_dns_cache>
+</yandex>

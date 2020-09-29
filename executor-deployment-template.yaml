@@ -21,9 +21,31 @@ spec:
       containers:
       - name: clickhouse-executor
         image: gcr.io/avid-life-273910/executor
+        env:
+        - name: RECEIVE_QUEUE_NAME
+          value: execute-{{.Id}}
       - name: clickhouse-server
         image: yandex/clickhouse-server:{{.ImageVersion}}
+        env:
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts: 
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/config.d
         ports:
-        - containerPort: 8080
+        - containerPort: 8123
+          protocol: 'TCP'
+        - containerPort: 9000
+          protocol: 'TCP'
+        - containerPort: 9004
+          protocol: 'TCP' 
+        - containerPort: 9009
+          protocol: 'TCP'
+      volumes:
+      - name: clickhouse-config
+        hostPath:
+          path: /home/azat/work/my-projects/clickhouse-playground/clickhouse-config
 ---
 {{end}}

@@ -21,4 +21,5 @@ require (
 	go.uber.org/multierr v1.5.0
 	go.uber.org/zap v1.14.1
 	google.golang.org/grpc v1.31.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

@@ -1,0 +1,100 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse-v20.9-deployment
+spec:
+  selector:
+    matchLabels:
+      app: clickhouse-playground
+      component: executor
+      versionId: v20.9
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: clickhouse-playground
+        component: executor
+        versionId: v20.9
+    spec:
+      shareProcessNamespace: true
+      containers:
+      - name: clickhouse-executor
+        image: gcr.io/avid-life-273910/executor
+        env:
+        - name: RECEIVE_QUEUE_NAME
+          value: execute-v20.9
+      - name: clickhouse-server
+        image: yandex/clickhouse-server:20.9
+        env:
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts: 
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/config.d
+        ports:
+        - containerPort: 8123
+          protocol: 'TCP'
+        - containerPort: 9000
+          protocol: 'TCP'
+        - containerPort: 9004
+          protocol: 'TCP' 
+        - containerPort: 9009
+          protocol: 'TCP'
+      volumes:
+      - name: clickhouse-config
+        hostPath:
+          path: /home/azat/work/my-projects/clickhouse-playground/clickhouse-config
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse-v20.8-deployment
+spec:
+  selector:
+    matchLabels:
+      app: clickhouse-playground
+      component: executor
+      versionId: v20.8
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: clickhouse-playground
+        component: executor
+        versionId: v20.8
+    spec:
+      shareProcessNamespace: true
+      containers:
+      - name: clickhouse-executor
+        image: gcr.io/avid-life-273910/executor
+        env:
+        - name: RECEIVE_QUEUE_NAME
+          value: execute-v20.8
+      - name: clickhouse-server
+        image: yandex/clickhouse-server:20.8
+        env:
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts: 
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/config.d
+        ports:
+        - containerPort: 8123
+          protocol: 'TCP'
+        - containerPort: 9000
+          protocol: 'TCP'
+        - containerPort: 9004
+          protocol: 'TCP' 
+        - containerPort: 9009
+          protocol: 'TCP'
+      volumes:
+      - name: clickhouse-config
+        hostPath:
+          path: /home/azat/work/my-projects/clickhouse-playground/clickhouse-config
+---

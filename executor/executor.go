@@ -10,16 +10,19 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type executor struct {
-	host string
+	host  string
+	ready chan struct{}
 	//mu   sync.Mutex
 }
 
 func NewExecutor(host string) (*executor, error) {
 	return &executor{
 		host: host,
+		ready: make(chan struct{}),
 	}, nil
 }
 
@@ -28,15 +31,15 @@ func (e *executor) runProcess(query string) (string, error) {
 	//e.mu.Lock()
 	//defer e.mu.Unlock()
 
-	fmt.Println("in exec")
-
 	cmd := exec.Command(
 		"clickhouse-client",
-		fmt.Sprintf("--host=%e", e.host),
+		fmt.Sprintf("--host=%s", e.host),
 		"-nm",
 		"-f",
 		"JSON",
 	)
+
+	log.Printf("%+v\n", cmd.Args)
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
@@ -47,18 +50,20 @@ func (e *executor) runProcess(query string) (string, error) {
 		return "", err
 	}
 
-	fmt.Println("starting clickhouse-client")
+	log.Println("starting clickhouse-client")
 
 	err = cmd.Start()
 	if err != nil {
 		return "", err
 	}
 
+	log.Printf("wrote \"%s\" to client stdin\n", query)
 	_, err = io.WriteString(stdin, query)
 	if err != nil {
 		return "", err
 	}
 
+	log.Println("close stdin")
 	// TODO: handle errors
 	stdin.Close()
 
@@ -67,7 +72,7 @@ func (e *executor) runProcess(query string) (string, error) {
 	//	return "", err
 	//}
 
-	fmt.Println("clickhouse-client ended")
+	log.Println("clickhouse-client ended")
 
 	if err == nil {
 		return outb.String(), nil
@@ -81,17 +86,16 @@ func (e *executor) runProcess(query string) (string, error) {
 	return "", err
 }
 
-func (e *executor) exec(query string) (string, error) {
+func (e *executor) exec(query string) ([]map[string]interface{}, error) {
 	processOutput, err := e.runProcess(query)
-	if err != nil {
-		return "", err
-	}
 
 	go func() {
 		processes, err := process.Processes()
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		log.Printf("current processes: %+v\n", processes)
 
 		for _, p := range processes {
 			cmd, err := p.Cmdline()
@@ -102,11 +106,19 @@ func (e *executor) exec(query string) (string, error) {
 			if cmd == "/pause" || cmd == "/clickhouse-executor" {
 				continue
 			} else {
-				fmt.Println("gonna kill", p.Pid, cmd)
+				log.Println("gonna kill", p.Pid, cmd)
 				p.Kill() // TODO: maybe more gracefully?
 			}
 		}
+
+		// TODO: something smarter
+		time.Sleep(20 * time.Second)
+		e.ready <- struct{}{}
 	}()
+
+	if err != nil {
+		return nil, err
+	}
 
 	list := make([]map[string]interface{}, 0)
 
@@ -117,7 +129,7 @@ func (e *executor) exec(query string) (string, error) {
 		err = d.Decode(&data)
 		if err != nil {
 			// TODO: handle EOF and others
-			fmt.Println(err)
+			log.Println(err)
 			break
 			//http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -125,11 +137,12 @@ func (e *executor) exec(query string) (string, error) {
 		list = append(list, data)
 	}
 
-	result, err := json.MarshalIndent(list, "", "    ")
-	if err != nil {
-		return "", err
-	}
+	//result, err := json.MarshalIndent(list, "", "    ")
+	//if err != nil {
+	//	return "", err
+	//}
 
-	return string(result), nil
+	//return string(result), nil
+
+	return list, nil
 }
-
