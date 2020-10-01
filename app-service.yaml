@@ -6,16 +6,16 @@ metadata:
         app: clickhouse-playground
         component: app
 spec:
-    type: LoadBalancer 
+    type: ClusterIP
     ports:
-      - port: 80
+      - port: 8080
         # protocol: TCP
         # nodePort: 30002
         targetPort: 8080
     selector:
         app: clickhouse-playground
         component: app
----    
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -23,13 +23,13 @@ func newPgServer(driver driver.Driver, s storage.Storage) *pgServer {
 }
 
 func main() {
-	s := storage.NewMemory()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	s, err := storage.NewDatabase()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	driver, err := driver.NewExecutor(
-		"amqp://user:4Pb4iaav1K@my-release-rabbitmq:5672",
+		"amqp://test:test@my-release-rabbitmq:5672",
 		"results",
 	)
 	if err != nil {
@@ -79,8 +79,8 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	output.Link = "/runs/" + query.Hash.Hex()
 
 	// TODO: check version
-	//found, err := s.storage.FindRun(query)
-	var found *models.Run = nil
+	found, err := s.storage.FindRun(query)
+	//var found *models.Run = nil
 
 	var result *models.Result
 

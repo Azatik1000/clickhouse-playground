@@ -18,9 +18,9 @@ func NewDatabase() (Storage, error) {
 	var err error
 
 	for i := 0; i < 5; i++ {
-		// TODO: maybe enable SSL?
+		// TODO: maybe enable SSL
 		// TODO: change to ticker and move to other func
-		db, err = gorm.Open("postgres", "host=db port=5432 user=postgres dbname=postgres password=example sslmode=disable")
+		db, err = gorm.Open("postgres", "host=my-postgres-postgresql port=5432 user=postgres dbname=postgres password=postgres sslmode=disable")
 		if err == nil {
 			break
 		}

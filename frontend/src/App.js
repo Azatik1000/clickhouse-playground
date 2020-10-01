@@ -159,8 +159,9 @@ class CodeForm extends React.Component {
         event.preventDefault();
 
         try {
-            const response = await Axios.post("http://localhost:3999/exec", {
-                query: code
+            const response = await Axios.post("/api/exec", {
+                query: code,
+                versionID: "v20.9"
             });
 
             this.props.onResponse(response);

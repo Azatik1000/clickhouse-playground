@@ -1,5 +1,5 @@
 versions:
 - id: "v20.9"
   imageVersion: "20.9"
-- id: "v20.8"
-  imageVersion: "20.8"
+# - id: "v20.8"
+#    imageVersion: "20.8"

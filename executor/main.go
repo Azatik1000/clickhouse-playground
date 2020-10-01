@@ -3,14 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/streadway/amqp"
 	"k8s.io/client-go/kubernetes"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"log"
 	"os"
-	"time"
 )
 
 type ExecServer struct {
@@ -18,16 +16,18 @@ type ExecServer struct {
 	mqConn           *amqp.Connection
 	mqChan           *amqp.Channel
 	receiveQueueName string
+	podManager       v12.PodInterface
 }
 
 func NewExecServer(
-	host string,
 	mqHost string,
 	receiveQueueName string,
+	podManager v12.PodInterface,
+	imageVersion string,
 ) (*ExecServer, error) {
 	var server ExecServer
 
-	executor, err := NewExecutor(host)
+	executor, err := NewExecutor(podManager, imageVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +57,8 @@ func NewExecServer(
 		return nil, err
 	}
 	server.receiveQueueName = receiveQueueName
+
+	server.podManager = podManager
 
 	return &server, nil
 }
@@ -130,9 +132,10 @@ func (s *ExecServer) handleRequests() error {
 		nil,   // args
 	)
 
-	for requestMsg := range requestMsgs {
-		s.handleRequestMsg(requestMsg)
+	for ; ; {
 		<-s.executor.ready
+		requestMsg := <-requestMsgs
+		s.handleRequestMsg(requestMsg)
 	}
 
 	return nil
@@ -146,7 +149,10 @@ func main() {
 
 	log.Printf("RECEIVE_QUEUE_NAME=%s\n", receiveQueueName)
 
-	log.Printf("MY_POD_NAME=%s\n", os.Getenv("MY_POD_NAME"))
+	imageVersion := os.Getenv("IMAGE_VERSION")
+	if imageVersion == "" {
+		log.Fatal("didn't specify IMAGE_VERSION")
+	}
 
 	// creates the in-cluster config
 	config, err := rest.InClusterConfig()
@@ -159,38 +165,12 @@ func main() {
 		panic(err.Error())
 	}
 
-	//clientset.CoreV1().Pods("").Get("kek")
-	for {
-		// get pods in all the namespaces by omitting namespace
-		// Or specify namespace to get pods in particular namespace
-		pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
-		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
-
-		//// Examples for error handling:
-		//// - Use helper functions e.g. errors.IsNotFound()
-		//// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-		//_, err = clientset.CoreV1().Pods("default").Get("example-xxxxx", metav1.GetOptions{})
-		//if errors.IsNotFound(err) {
-		//	fmt.Printf("Pod example-xxxxx not found in default namespace\n")
-		//} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
-		//	fmt.Printf("Error getting pod %v\n", statusError.ErrStatus.Message)
-		//} else if err != nil {
-		//	panic(err.Error())
-		//} else {
-		//	fmt.Printf("Found example-xxxxx pod in default namespace\n")
-		//}
-
-		time.Sleep(10 * time.Second)
-	}
-
 	// TODO: move user/pass to config
 	server, err := NewExecServer(
-		"localhost",
-		"amqp://user:4Pb4iaav1K@my-release-rabbitmq:5672",
+		"amqp://test:test@my-release-rabbitmq:5672",
 		receiveQueueName,
+		clientset.CoreV1().Pods("default"),
+		imageVersion,
 	)
 
 	if err != nil {
@@ -198,7 +178,7 @@ func main() {
 	}
 
 	// TODO: change to smth smarter
-	time.Sleep(15 * time.Second)
+	//time.Sleep(15 * time.Second)
 	// infinite
 	server.handleRequests()
 }

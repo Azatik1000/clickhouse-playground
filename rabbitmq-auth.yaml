@@ -3,7 +3,7 @@ kind: Secret
 metadata:
   name: rabbitmq-consumer-secret
 data:
-  RabbitMqHost: YW1xcDovL3VzZXI6NFBiNGlhYXYxS0BteS1yZWxlYXNlLXJhYmJpdG1xOjU2NzI=
+  RabbitMqHost: YW1xcDovL3Rlc3Q6dGVzdEBteS1yZWxlYXNlLXJhYmJpdG1xOjU2NzI=
 ---
 apiVersion: keda.k8s.io/v1alpha1
 kind: TriggerAuthentication
