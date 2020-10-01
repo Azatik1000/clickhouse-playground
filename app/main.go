@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go"
+	mux "github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"log"
 	"net/http"
@@ -40,10 +41,16 @@ func main() {
 
 	c := cors.Default()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/exec", server.handleExec)
+	r := mux.NewRouter()
+	r.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		log.Println("in default handler")
+		writer.WriteHeader(http.StatusOK)
+	})
 
-	handler := c.Handler(mux)
+	r.HandleFunc("/api/exec", server.handleExec)
+	r.HandleFunc("/api/runs/{ID:[a-zA-Z0-9]+}", server.handleRun)
+
+	handler := c.Handler(r)
 
 	_ = http.ListenAndServe(":8080", handler)
 }
@@ -61,6 +68,8 @@ type execOutput struct {
 
 // TODO: add logging to requests through wrappers
 func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
+	log.Println("in exec handler")
+
 	decoder := json.NewDecoder(r.Body)
 
 	var input execInput
@@ -112,3 +121,60 @@ func (s *pgServer) handleExec(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	encoder.Encode(output)
 }
+
+func (s *pgServer) handleRun(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+
+	vars := mux.Vars(r)
+	
+
+	var input execInput
+	err := decoder.Decode(&input)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Println("read your query")
+
+	var output execOutput
+
+	query := models.NewQuery(input.QueryStr)
+	// TODO: move to getlink method
+	output.Link = "/run/" + query.Hash.Hex()
+
+	// TODO: check version
+	found, err := s.storage.FindRun(query)
+	//var found *models.Run = nil
+
+	var result *models.Result
+
+	// This query 's been already run
+	if found != nil {
+		output.Cached = true
+		result = &found.Result
+	} else {
+		output.Cached = false
+
+		fmt.Println("sending your query to driver")
+
+		result, err = s.driver.Exec(input.QueryStr, input.VersionID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// TODO: pointers ok?
+		s.storage.AddRun(&models.Run{
+			Query:  *query,
+			Result: *result,
+		})
+	}
+
+	d := json.NewDecoder(strings.NewReader(string(*result)))
+	d.Decode(&output.Result)
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(output)
+}
+

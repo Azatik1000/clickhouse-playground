@@ -68,9 +68,13 @@ install-rabbitmq: gke-connect
 	touch install-rabbitmq
 
 frontend-docker: gke-connect ${FRONTEND_DIRECTORY} ${FRONTEND_FILES}
-	docker build -t gcr.io/${PROJECT_ID}/frontend ../frontend
-	docker push gcr.io/${PROJECT_ID}/frontend
+	docker build -t gcr.io/${PROJECT_ID}/frontend:latest ../frontend
+	docker push gcr.io/${PROJECT_ID}/frontend:latest
 	touch frontend-docker
+
+update-frontend: frontend-docker
+	kubectl set image deployments/frontend frontend=gcr.io/${PROJECT_ID}/frontend
+	kubectl rollout restart deployment/frontend
 
 app-docker: gke-connect move-configurations ${APP_DIRECTORY} ${APP_FILES}
 	docker build -t gcr.io/${PROJECT_ID}/app ../app

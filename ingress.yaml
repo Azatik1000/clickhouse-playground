@@ -4,7 +4,6 @@ metadata:
   name: minimal-ingress
   annotations:
     kubernetes.io/ingress.class: "gce"
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   # defaultBackend:
   #   service:

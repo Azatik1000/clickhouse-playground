@@ -35,5 +35,6 @@ spec:
             containers:
               - name: app
                 image: gcr.io/avid-life-273910/app
+                imagePullPolicy: "Always"
                 ports:
-                  - containerPort: 8080
+                - containerPort: 8080

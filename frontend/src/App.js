@@ -5,12 +5,20 @@ import './App.css';
 
 import {useTable} from 'react-table'
 
+import {
+    BrowserRouter as Router,
+    Switch,
+    Route,
+    Link
+} from "react-router-dom";
+
 class CodeExecutor extends React.Component {
     constructor(props) {
         super(props);
         this.state = {response: null};
 
-        this.handleResponse = this.handleResponse.bind(this);
+        // this.handleResponse = this.handleResponse.bind(this);
+        this.handleExecute = this.handleExecute.bind(this);
     }
 
     handleResponse(response) {
@@ -19,14 +27,25 @@ class CodeExecutor extends React.Component {
 
         // TODO: maybe change data?
         // window.history.pushState("lol", "", response.data.link);
+    }
 
-        this.setState({response: JSON.stringify(response.data)});
+    async handleExecute(code, versionID) {
+        try {
+            const response = await Axios.post("/api/exec", {
+                query: code,
+                versionID: versionID
+            });
+
+            this.setState({response: JSON.stringify(response.data)});
+        } catch (e) {
+            console.log(e);
+        }
     }
 
     render() {
         return (
             <div>
-                <CodeForm onResponse={this.handleResponse}/>
+                <CodeForm onSubmit={this.handleExecute}/>
                 <ResultView response={this.state.response}/>
             </div>
         )
@@ -144,51 +163,70 @@ class CodeForm extends React.Component {
         super(props);
         this.state = {code: ''};
 
-        this.handleChange = this.handleChange.bind(this);
+        this.handleCodeChange = this.handleCodeChange.bind(this);
+        this.handleVersionChange = this.handleVersionChange.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
     }
 
-    handleChange(event) {
+    handleCodeChange(event) {
         this.setState({code: event.target.value});
+    }
+
+    handleVersionChange(event) {
+        this.setState({versionID: event.target.value})
     }
 
     async handleSubmit(event) {
         const code = this.state.code;
+        const versionID = this.state.versionID
         // alert(`Submitted ${this.state.value}`);
         // this.setState({value: ''});
         event.preventDefault();
 
-        try {
-            const response = await Axios.post("/api/exec", {
-                query: code,
-                versionID: "v20.9"
-            });
-
-            this.props.onResponse(response);
-        } catch (e) {
-            console.log(e);
-        }
+        await this.props.onSubmit(code, versionID)
     }
 
     render() {
         return (
             <form onSubmit={this.handleSubmit}>
                 <label>
-                    Code:
-                    <textarea cols="40" rows="5" value={this.state.code} onChange={this.handleChange}/>
+                    <textarea cols="40" rows="5" value={this.state.code} onChange={this.handleCodeChange}/>
                 </label>
+
+                <input type="radio" name="version" id="v20.9" onChange={this.handleVersionChange} value="v20.9" />
+                <label htmlFor="v20.9">v20.9</label>
+
+                <input type="radio" name="version" id="v20.8" onChange={this.handleVersionChange} value="v20.8" />
+                <label htmlFor="v20.8">v20.8</label>
+
                 <input type="submit" value="Submit"/>
             </form>
         )
     }
 }
 
+
+
 function App() {
     return (
-        <div className="App">
-            <h1>ClickHouse Playground</h1>
-            <CodeExecutor/>
-        </div>
+        <Router>
+            <div>
+                <Switch>
+                    <Route path="/runs/:id">
+                        <div className="App">
+                            <h1>ClickHouse Explorer</h1>
+                            <CodeExecutor/>
+                        </div>
+                    </Route>
+                    <Route path="/">
+                        <div className="App">
+                            <h1>ClickHouse Explorer</h1>
+                            <CodeExecutor/>
+                        </div>
+                    </Route>
+                </Switch>
+            </div>
+        </Router>
     );
 }
 

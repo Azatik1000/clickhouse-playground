@@ -17,6 +17,7 @@ spec:
       containers:
       - name: frontend
         image: gcr.io/avid-life-273910/frontend
+        imagePullPolicy: "Always"
         stdin: true
         ports:
         - containerPort: 3000
