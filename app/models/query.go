@@ -32,10 +32,18 @@ func (h *Hash) Hex() string {
 }
 
 type Query struct {
-	Str  string `gorm:"UNIQUE"` // TODO: do i want to? (unique)
+	Text string `gorm:"UNIQUE"` // TODO: do i want to? (unique)
 	Hash Hash   `gorm:"UNIQUE"` // TODO: do i want to? (unique)
 }
 
-func NewQuery(str string) *Query {
-	return &Query{Str: str, Hash: sha256.Sum256([]byte(str))}
+func NewQuery(versionID string, text string) *Query {
+	encoded := fmt.Sprintf("%s:%s", versionID, text)
+	return &Query{Text: text, Hash: sha256.Sum256([]byte(encoded))}
+}
+
+func QueryFromHash(hash [32]byte) *Query {
+	return &Query{
+		Text: "",
+		Hash: hash,
+	}
 }

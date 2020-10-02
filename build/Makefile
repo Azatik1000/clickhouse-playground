@@ -81,6 +81,10 @@ app-docker: gke-connect move-configurations ${APP_DIRECTORY} ${APP_FILES}
 	docker push gcr.io/${PROJECT_ID}/app
 	touch app-docker
 
+update-app: app-docker
+	kubectl set image deployments/app-deployment app=gcr.io/${PROJECT_ID}/app
+	kubectl rollout restart deployment/app-deployment
+
 executor-docker: gke-connect ${EXECUTOR_DIRECTORY} ${EXECUTOR_FILES}
 	docker build -t gcr.io/${PROJECT_ID}/executor ../executor
 	docker push gcr.io/${PROJECT_ID}/executor

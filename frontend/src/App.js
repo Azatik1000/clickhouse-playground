@@ -9,7 +9,8 @@ import {
     BrowserRouter as Router,
     Switch,
     Route,
-    Link
+    Link,
+    useParams
 } from "react-router-dom";
 
 class CodeExecutor extends React.Component {
@@ -19,6 +20,18 @@ class CodeExecutor extends React.Component {
 
         // this.handleResponse = this.handleResponse.bind(this);
         this.handleExecute = this.handleExecute.bind(this);
+
+        // let { id } = useParams();
+
+        console.log(this.props)
+        // console.log(this.props.match.params)
+        if (!this.props.match) {
+            return;
+        }
+
+        if (this.props.match.params.id) {
+            this.handleLoadRun(this.props.match.params.id);
+        }
     }
 
     handleResponse(response) {
@@ -27,6 +40,15 @@ class CodeExecutor extends React.Component {
 
         // TODO: maybe change data?
         // window.history.pushState("lol", "", response.data.link);
+    }
+
+    async handleLoadRun(runID) {
+        try {
+            const response = await Axios.get(`/api/run/${runID}`);
+            this.setState({response: JSON.stringify(response.data)});
+        } catch (e) {
+            console.log(e);
+        }
     }
 
     async handleExecute(code, versionID) {
@@ -193,10 +215,10 @@ class CodeForm extends React.Component {
                     <textarea cols="40" rows="5" value={this.state.code} onChange={this.handleCodeChange}/>
                 </label>
 
-                <input type="radio" name="version" id="v20.9" onChange={this.handleVersionChange} value="v20.9" />
+                <input type="radio" name="version" id="v20.9" onChange={this.handleVersionChange} value="v20.9"/>
                 <label htmlFor="v20.9">v20.9</label>
 
-                <input type="radio" name="version" id="v20.8" onChange={this.handleVersionChange} value="v20.8" />
+                <input type="radio" name="version" id="v20.8" onChange={this.handleVersionChange} value="v20.8"/>
                 <label htmlFor="v20.8">v20.8</label>
 
                 <input type="submit" value="Submit"/>
@@ -206,23 +228,15 @@ class CodeForm extends React.Component {
 }
 
 
-
 function App() {
     return (
         <Router>
-            <div>
+            <div className="App">
+                <h1>ClickHouse Explorer</h1>
                 <Switch>
-                    <Route path="/runs/:id">
-                        <div className="App">
-                            <h1>ClickHouse Explorer</h1>
-                            <CodeExecutor/>
-                        </div>
-                    </Route>
+                    <Route path="/run/:id" render={(props)=> <CodeExecutor {...props}/>} />
                     <Route path="/">
-                        <div className="App">
-                            <h1>ClickHouse Explorer</h1>
-                            <CodeExecutor/>
-                        </div>
+                        <CodeExecutor/>
                     </Route>
                 </Switch>
             </div>

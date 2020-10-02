@@ -2,6 +2,8 @@ package storage
 
 import (
 	"app/models"
+	"errors"
+	"fmt"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"time"
@@ -45,9 +47,15 @@ func (d Database) AddRun(run *models.Run) error {
 func (d Database) FindRun(query *models.Query) (*models.Run, error) {
 	//var run models.Run
 	var run models.Run
+
+	fmt.Printf("%+v", &models.Run{Query: models.Query{Hash: query.Hash}})
 	err := d.db.Where(&models.Run{Query: models.Query{Hash: query.Hash}}).
 		Take(&run).
 		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
 
 	if err != nil {
 		return nil, err
